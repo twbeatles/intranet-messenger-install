@@ -7,6 +7,7 @@ import logging
 import threading
 import os
 import re
+import sqlite3
 from datetime import datetime, timezone, timedelta
 
 from app.models.base import get_db, safe_file_delete
@@ -45,39 +46,224 @@ def get_server_stats():
         return server_stats.copy()
 
 
-def create_message(room_id, sender_id, content, message_type='text', 
-                   file_path=None, file_name=None, reply_to=None, encrypted=True):
-    """메시지 생성"""
+def _now_kst() -> str:
     kst = timezone(timedelta(hours=9))
-    now_kst = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
-    
+    return datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _normalize_client_msg_id(client_msg_id: str | None) -> str | None:
+    if not isinstance(client_msg_id, str):
+        return None
+    normalized = client_msg_id.strip()[:64]
+    return normalized or None
+
+
+def _insert_message_row(
+    cursor,
+    *,
+    room_id: int,
+    sender_id: int,
+    content: str,
+    encrypted: bool,
+    message_type: str,
+    file_path: str | None,
+    file_name: str | None,
+    reply_to: int | None,
+    client_msg_id: str | None,
+    created_at: str,
+) -> int:
+    cursor.execute(
+        '''
+        INSERT INTO messages (
+            room_id, sender_id, content, encrypted, message_type,
+            file_path, file_name, client_msg_id, reply_to, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            room_id,
+            sender_id,
+            content,
+            1 if encrypted else 0,
+            message_type,
+            file_path,
+            file_name,
+            client_msg_id,
+            reply_to,
+            created_at,
+        ),
+    )
+    return int(cursor.lastrowid or 0)
+
+
+def _get_message_with_sender(cursor, message_id: int) -> dict | None:
+    cursor.execute(
+        '''
+        SELECT m.*, u.nickname as sender_name, u.profile_image as sender_image,
+               rm.content as reply_content, ru.nickname as reply_sender
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        LEFT JOIN messages rm ON m.reply_to = rm.id AND rm.room_id = m.room_id
+        LEFT JOIN users ru ON rm.sender_id = ru.id
+        WHERE m.id = ?
+        ''',
+        (message_id,),
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
+def get_message_by_client_msg_id(room_id: int, sender_id: int, client_msg_id: str) -> dict | None:
+    """Idempotency lookup helper for client message IDs."""
+    normalized = _normalize_client_msg_id(client_msg_id)
+    if not normalized:
+        return None
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
-            INSERT INTO messages (room_id, sender_id, content, encrypted, message_type, file_path, file_name, reply_to, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (room_id, sender_id, content, 1 if encrypted else 0, message_type, file_path, file_name, reply_to, now_kst))
-        message_id = cursor.lastrowid
+        cursor.execute(
+            '''
+            SELECT id
+            FROM messages
+            WHERE room_id = ? AND sender_id = ? AND client_msg_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            ''',
+            (room_id, sender_id, normalized),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        message = _get_message_with_sender(cursor, int(row['id']))
+        if message:
+            message['__created'] = False
+        return message
+    except Exception as e:
+        logger.error(f"Get message by client_msg_id error: {e}")
+        return None
+
+
+def create_message(
+    room_id,
+    sender_id,
+    content,
+    message_type='text',
+    file_path=None,
+    file_name=None,
+    reply_to=None,
+    encrypted=True,
+    client_msg_id: str | None = None,
+):
+    """메시지 생성"""
+    now_kst = _now_kst()
+    normalized_client_msg_id = _normalize_client_msg_id(client_msg_id)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        message_id = _insert_message_row(
+            cursor,
+            room_id=int(room_id),
+            sender_id=int(sender_id),
+            content=content,
+            encrypted=bool(encrypted),
+            message_type=message_type,
+            file_path=file_path,
+            file_name=file_name,
+            reply_to=reply_to,
+            client_msg_id=normalized_client_msg_id,
+            created_at=now_kst,
+        )
         conn.commit()
-        
-        # [v4.35] 답장 정보 포함하여 조회
-        cursor.execute('''
-            SELECT m.*, u.nickname as sender_name, u.profile_image as sender_image,
-                   rm.content as reply_content, ru.nickname as reply_sender
-            FROM messages m
-            JOIN users u ON m.sender_id = u.id
-            LEFT JOIN messages rm ON m.reply_to = rm.id AND rm.room_id = m.room_id
-            LEFT JOIN users ru ON rm.sender_id = ru.id
-            WHERE m.id = ?
-        ''', (message_id,))
-        message = cursor.fetchone()
-        
+        message = _get_message_with_sender(cursor, message_id)
+
         update_server_stats('total_messages')
-        
-        return dict(message) if message else None
+
+        if message:
+            message['__created'] = True
+        return message
+    except sqlite3.IntegrityError as e:
+        # Duplicate (room_id, sender_id, client_msg_id) replay -> return existing row.
+        if normalized_client_msg_id:
+            existing = get_message_by_client_msg_id(int(room_id), int(sender_id), normalized_client_msg_id)
+            if existing:
+                return existing
+        logger.error(f"Create message integrity error: {e}")
+        return None
     except Exception as e:
         logger.error(f"Create message error: {e}")
+        return None
+
+
+def create_file_message_with_record(
+    room_id: int,
+    sender_id: int,
+    *,
+    content: str,
+    message_type: str,
+    file_path: str,
+    file_name: str | None = None,
+    file_size: int | None = None,
+    reply_to: int | None = None,
+    client_msg_id: str | None = None,
+) -> dict | None:
+    """
+    Atomically create a file/image message and its room_files row.
+    Rolls back DB state and deletes uploaded file on failure.
+    """
+    now_kst = _now_kst()
+    normalized_client_msg_id = _normalize_client_msg_id(client_msg_id)
+    conn = get_db()
+    cursor = conn.cursor()
+    full_path = os.path.join(UPLOAD_FOLDER, file_path)
+    try:
+        message_id = _insert_message_row(
+            cursor,
+            room_id=int(room_id),
+            sender_id=int(sender_id),
+            content=content,
+            encrypted=False,
+            message_type=message_type,
+            file_path=file_path,
+            file_name=file_name,
+            reply_to=reply_to,
+            client_msg_id=normalized_client_msg_id,
+            created_at=now_kst,
+        )
+        cursor.execute(
+            '''
+            INSERT INTO room_files (room_id, uploaded_by, file_path, file_name, file_size, file_type, message_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (room_id, sender_id, file_path, file_name or '', file_size, message_type, message_id),
+        )
+        conn.commit()
+        message = _get_message_with_sender(cursor, message_id)
+        update_server_stats('total_messages')
+        if message:
+            message['__created'] = True
+        return message
+    except sqlite3.IntegrityError as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        if normalized_client_msg_id:
+            existing = get_message_by_client_msg_id(room_id, sender_id, normalized_client_msg_id)
+            if existing:
+                # Duplicate replay with a freshly uploaded file should not leak orphan files.
+                safe_file_delete(full_path)
+                return existing
+        safe_file_delete(full_path)
+        logger.error(f"Create file message integrity error: {e}")
+        return None
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        safe_file_delete(full_path)
+        logger.error(f"Create file message error: {e}")
         return None
 
 

@@ -196,6 +196,7 @@ def init_db():
                 message_type TEXT DEFAULT 'text',
                 file_path TEXT,
                 file_name TEXT,
+                client_msg_id TEXT,
                 reply_to INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (room_id) REFERENCES rooms(id),
@@ -335,7 +336,8 @@ def init_db():
                 'last_read_message_id': 'INTEGER DEFAULT 0'
             },
             'messages': {
-                'reply_to': 'INTEGER'
+                'reply_to': 'INTEGER',
+                'client_msg_id': 'TEXT',
             },
             'device_sessions': {
                 'remember': 'INTEGER DEFAULT 1',
@@ -360,6 +362,7 @@ def init_db():
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_file_name ON messages(file_name)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_client_msg_id ON messages(client_msg_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_room_members_room_id ON room_members(room_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON message_reactions(message_id)')
@@ -367,6 +370,13 @@ def init_db():
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_room_members_room_user ON room_members(room_id, user_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_poll_votes_poll_user ON poll_votes(poll_id, user_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_room_files_file_path ON room_files(file_path)')
+            cursor.execute(
+                '''
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_room_sender_client_msg_unique
+                ON messages(room_id, sender_id, client_msg_id)
+                WHERE client_msg_id IS NOT NULL AND client_msg_id <> ''
+                '''
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)")
             cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_device_sessions_user_revoked '

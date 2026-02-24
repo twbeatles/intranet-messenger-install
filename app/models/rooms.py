@@ -257,40 +257,78 @@ def add_room_member(room_id, user_id):
 
 
 def leave_room_db(room_id, user_id):
-    """대화방 나가기"""
+    """대화방 나가기. 실제 삭제가 이루어진 경우에만 True 반환."""
     conn = get_db()
     try:
         conn.execute("BEGIN IMMEDIATE")
     except Exception:
         pass
-        
+
     cursor = conn.cursor()
     try:
-        if is_room_admin(room_id, user_id):
-            cursor.execute('''
-                SELECT u.id FROM users u
-                JOIN room_members rm ON u.id = rm.user_id
-                WHERE rm.room_id = ? AND (rm.role = 'admin' OR u.id = (SELECT created_by FROM rooms WHERE id = ?))
-            ''', (room_id, room_id))
-            admin_ids = [row['id'] for row in cursor.fetchall()]
-            
-            if len(admin_ids) == 1 and admin_ids[0] == user_id:
-                members = get_room_members(room_id)
-                for member in members:
-                    if member['id'] != user_id:
-                        cursor.execute('UPDATE room_members SET role = ? WHERE room_id = ? AND user_id = ?',
-                                       ('admin', room_id, member['id']))
-                        logger.info(f"Admin auto-delegated: room {room_id}")
-                        break
-        
+        cursor.execute('SELECT created_by FROM rooms WHERE id = ?', (room_id,))
+        room = cursor.fetchone()
+        if not room:
+            conn.rollback()
+            return False
+
+        cursor.execute('SELECT role FROM room_members WHERE room_id = ? AND user_id = ?', (room_id, user_id))
+        member = cursor.fetchone()
+        if not member:
+            conn.rollback()
+            return False
+
+        previous_creator = room['created_by']
+        was_creator = int(previous_creator or 0) == int(user_id)
+
         cursor.execute('DELETE FROM room_members WHERE room_id = ? AND user_id = ?', (room_id, user_id))
+        if int(cursor.rowcount or 0) < 1:
+            conn.rollback()
+            return False
+
+        cursor.execute(
+            '''
+            SELECT user_id, COALESCE(role, 'member') AS role
+            FROM room_members
+            WHERE room_id = ?
+            ORDER BY CASE WHEN COALESCE(role, 'member') = 'admin' THEN 0 ELSE 1 END, user_id ASC
+            ''',
+            (room_id,),
+        )
+        remaining_members = [dict(row) for row in cursor.fetchall()]
+
+        if not remaining_members:
+            cursor.execute('UPDATE rooms SET created_by = NULL WHERE id = ?', (room_id,))
+            conn.commit()
+            return True
+
+        remaining_ids = {int(row['user_id']) for row in remaining_members}
+        next_creator = int(previous_creator or 0)
+        if was_creator or next_creator not in remaining_ids:
+            next_creator = int(remaining_members[0]['user_id'])
+            cursor.execute('UPDATE rooms SET created_by = ? WHERE id = ?', (next_creator, room_id))
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM room_members WHERE room_id = ? AND COALESCE(role, 'member') = 'admin'",
+            (room_id,),
+        )
+        admin_count = int(cursor.fetchone()[0] or 0)
+        if admin_count == 0:
+            cursor.execute(
+                "UPDATE room_members SET role = 'admin' WHERE room_id = ? AND user_id = ?",
+                (room_id, next_creator),
+            )
+            logger.info(f"Admin auto-delegated: room {room_id}")
+
         conn.commit()
+        return True
     except Exception as e:
         logger.error(f"Leave room error: {e}")
         try:
             conn.rollback()
         except Exception:
             pass
+        return False
 
 
 def update_room_name(room_id, new_name):
@@ -382,14 +420,16 @@ def is_room_admin(room_id: int, user_id: int):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT created_by FROM rooms WHERE id = ?', (room_id,))
-        room = cursor.fetchone()
-        if room and room['created_by'] == user_id:
-            return True
-        
         cursor.execute('SELECT role FROM room_members WHERE room_id = ? AND user_id = ?', (room_id, user_id))
         member = cursor.fetchone()
-        return member and member['role'] == 'admin'
+        if not member:
+            return False
+        if member['role'] == 'admin':
+            return True
+
+        cursor.execute('SELECT created_by FROM rooms WHERE id = ?', (room_id,))
+        room = cursor.fetchone()
+        return bool(room and int(room['created_by'] or 0) == int(user_id))
     except Exception as e:
         logger.error(f"Check room admin error: {e}")
         return False

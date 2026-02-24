@@ -14,9 +14,9 @@ from app.api_response import build_socket_error_payload
 from app.i18n import resolve_socket_locale
 from app.models import (
     update_user_status, get_user_by_id, is_room_member, is_room_admin,
-    create_message, update_last_read, get_unread_count, server_stats,
+    create_message, create_file_message_with_record, update_last_read, get_unread_count, server_stats,
     get_user_rooms, edit_message, delete_message,
-    get_user_session_token, get_message_room_id, get_message_reactions,
+    get_user_session_token, get_message_room_id, get_message_reactions, get_message_by_client_msg_id,
     get_poll, get_pinned_messages, get_room_admins
 )
 from app.upload_tokens import consume_upload_token, get_upload_token_failure_reason
@@ -133,6 +133,12 @@ def register_socket_events(socketio):
                 user_sids[user_id] = []
             user_sids[user_id].append(request.sid)
             was_offline = len(user_sids[user_id]) == 1
+
+        # Personal channel for direct user-targeted events.
+        try:
+            join_room(f'user_{int(user_id)}')
+        except Exception:
+            pass
 
         # Join all my rooms so this client receives room events without polling.
         room_ids = get_user_room_ids(user_id)
@@ -263,6 +269,8 @@ def register_socket_events(socketio):
     @socketio.on('send_message')
     def handle_send_message(data):
         try:
+            if not isinstance(data, dict):
+                data = {}
             if 'user_id' not in session:
                 _emit_error_i18n('로그인이 필요합니다.')
                 return {'ok': False, 'error': '로그인이 필요합니다.'}
@@ -280,8 +288,11 @@ def register_socket_events(socketio):
                 content = ''
             
             message_type = data.get('type', 'text')
-            # 허용된 메시지 타입만 사용
-            allowed_types = {'text', 'file', 'image', 'system'}
+            if message_type == 'system':
+                _emit_error_i18n('잘못된 요청입니다.')
+                return {'ok': False, 'error': '잘못된 요청입니다.'}
+            # 허용된 메시지 타입만 사용 (system은 서버 내부 이벤트 전용)
+            allowed_types = {'text', 'file', 'image'}
             if message_type not in allowed_types:
                 message_type = 'text'
             
@@ -299,7 +310,7 @@ def register_socket_events(socketio):
                 client_msg_id = ''
             client_msg_id = client_msg_id.strip()[:64]
 
-            if message_type in ('text', 'system'):
+            if message_type == 'text':
                 if encrypted:
                     # Do not truncate ciphertext; reject only extreme payload size.
                     if len(content) > 200000:
@@ -323,6 +334,12 @@ def register_socket_events(socketio):
                 if reply_room_id is None or int(reply_room_id) != int(room_id):
                     _emit_error_i18n('잘못된 요청입니다.')
                     return {'ok': False, 'error': '잘못된 요청입니다.'}
+
+            # Idempotency shortcut for retries/reconnects.
+            if client_msg_id:
+                existing_message = get_message_by_client_msg_id(room_id, session['user_id'], client_msg_id)
+                if existing_message:
+                    return {'ok': True, 'message_id': int(existing_message.get('id') or 0)}
 
             if message_type in ('file', 'image'):
                 token = data.get('upload_token')
@@ -354,35 +371,52 @@ def register_socket_events(socketio):
 
             if not content and not file_path:
                 return {'ok': False, 'error': '잘못된 요청입니다.'}
-            
-            message = create_message(
-                room_id, session['user_id'], content, message_type, file_path, file_name, reply_to, encrypted
-            )
+
+            if message_type in ('file', 'image') and file_path:
+                normalized_file_size = None
+                try:
+                    if file_size is not None:
+                        normalized_file_size = int(file_size)
+                except (TypeError, ValueError):
+                    normalized_file_size = None
+                message = create_file_message_with_record(
+                    room_id=int(room_id),
+                    sender_id=int(session['user_id']),
+                    content=content,
+                    message_type=message_type,
+                    file_path=str(file_path),
+                    file_name=str(file_name or ''),
+                    file_size=normalized_file_size,
+                    reply_to=reply_to,
+                    client_msg_id=client_msg_id or None,
+                )
+            else:
+                message = create_message(
+                    room_id,
+                    session['user_id'],
+                    content,
+                    message_type,
+                    file_path,
+                    file_name,
+                    reply_to,
+                    encrypted,
+                    client_msg_id=client_msg_id or None,
+                )
             if message:
+                created = bool(message.pop('__created', True))
+                message_id = int(message.get('id') or 0)
+                if not created:
+                    return {'ok': True, 'message_id': message_id}
                 if client_msg_id:
                     message['client_msg_id'] = client_msg_id
                 message['unread_count'] = get_unread_count(room_id, message['id'], session['user_id'])
-                if message_type in ('file', 'image') and file_path:
-                    from app.models import add_room_file
-
-                    try:
-                        add_room_file(room_id, session['user_id'], file_path, file_name, file_size, message_type, message['id'])
-                    except Exception as e:
-                        logger.error(f"Failed to add room file record: {e}")
-                        logger.warning(
-                            f"Potential orphan upload file detected: room={room_id}, user={session['user_id']}, path={file_path}"
-                        )
 
                 emit('new_message', message, room=f'room_{room_id}')
                 # broadcast 대신 해당 방 멤버들의 모든 세션에 전송
                 logger.debug(f"Message sent: room={room_id}, user={session['user_id']}, type={message_type}")
-                return {'ok': True, 'message_id': int(message.get('id') or 0)}
+                return {'ok': True, 'message_id': message_id}
             else:
                 logger.warning(f"Message creation failed: room={room_id}, user={session['user_id']}")
-                if message_type in ('file', 'image') and file_path:
-                    logger.warning(
-                        f"Potential orphan upload file after message failure: room={room_id}, user={session['user_id']}, path={file_path}"
-                    )
                 _emit_error_i18n('메시지 저장에 실패했습니다.')
                 return {'ok': False, 'error': '메시지 저장에 실패했습니다.'}
         except Exception as e:

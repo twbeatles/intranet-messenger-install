@@ -62,11 +62,13 @@ from app.models.rooms import (
 # Messages - 메시지 관리
 from app.models.messages import (
     create_message,
+    create_file_message_with_record,
     get_room_messages,
     update_last_read,
     get_unread_count,
     get_room_last_reads,
     get_message_room_id,
+    get_message_by_client_msg_id,
     delete_message,
     edit_message,
     search_messages,
@@ -120,7 +122,8 @@ __all__ = [
     'set_room_admin', 'is_room_admin', 'get_room_admins',
     # Messages
     'create_message', 'get_room_messages', 'update_last_read', 'get_unread_count',
-    'get_room_last_reads', 'get_message_room_id', 'delete_message', 'edit_message',
+    'create_file_message_with_record', 'get_room_last_reads', 'get_message_room_id',
+    'get_message_by_client_msg_id', 'delete_message', 'edit_message',
     'search_messages', 'advanced_search', 'pin_message', 'unpin_message', 'get_pinned_messages',
     'server_stats', 'update_server_stats', 'get_server_stats',
     # Polls

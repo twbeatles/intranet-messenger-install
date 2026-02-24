@@ -186,23 +186,38 @@ def rotate_device_session_token(
     }
 
 
-def list_active_device_sessions(user_id: int) -> list[dict[str, Any]]:
+def list_active_device_sessions(user_id: int, *, include_expired: bool = False) -> list[dict[str, Any]]:
     """List non-revoked sessions for the user, including expired status."""
     conn = get_db()
     cursor = conn.cursor()
     now = _fmt_ts(_now_utc())
-    cursor.execute(
-        '''
-        SELECT id, user_id, device_id, device_name, created_at, last_used_at,
-               expires_at, ip, user_agent, remember, ttl_days,
-               CASE WHEN expires_at <= ? THEN 1 ELSE 0 END AS is_expired
-        FROM device_sessions
-        WHERE user_id = ?
-          AND revoked_at IS NULL
-        ORDER BY last_used_at DESC, id DESC
-        ''',
-        (now, user_id),
-    )
+    if include_expired:
+        cursor.execute(
+            '''
+            SELECT id, user_id, device_id, device_name, created_at, last_used_at,
+                   expires_at, ip, user_agent, remember, ttl_days,
+                   CASE WHEN expires_at <= ? THEN 1 ELSE 0 END AS is_expired
+            FROM device_sessions
+            WHERE user_id = ?
+              AND revoked_at IS NULL
+            ORDER BY last_used_at DESC, id DESC
+            ''',
+            (now, user_id),
+        )
+    else:
+        cursor.execute(
+            '''
+            SELECT id, user_id, device_id, device_name, created_at, last_used_at,
+                   expires_at, ip, user_agent, remember, ttl_days,
+                   CASE WHEN expires_at <= ? THEN 1 ELSE 0 END AS is_expired
+            FROM device_sessions
+            WHERE user_id = ?
+              AND revoked_at IS NULL
+              AND expires_at > ?
+            ORDER BY last_used_at DESC, id DESC
+            ''',
+            (now, user_id, now),
+        )
     rows = cursor.fetchall()
     return [dict(r) for r in rows]
 

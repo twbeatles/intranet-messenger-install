@@ -101,6 +101,7 @@ def register_routes(app):
         payload: dict | None = None,
         *,
         room_id: int | None = None,
+        user_ids: list[int] | None = None,
         broadcast: bool = False,
     ) -> None:
         """REST 처리 결과를 소켓으로 동기화한다."""
@@ -112,12 +113,28 @@ def register_routes(app):
         if socketio_instance is None:
             return
 
-        kwargs: dict[str, object] = {}
+        emitted = False
+        body = payload or {}
         if room_id is not None:
-            kwargs['room'] = f'room_{int(room_id)}'
-        # Flask-SocketIO server emit defaults to all clients when room is not provided.
-        _ = broadcast
-        socketio_instance.emit(event, payload or {}, **kwargs)
+            socketio_instance.emit(event, body, room=f'room_{int(room_id)}')
+            emitted = True
+
+        if user_ids:
+            seen_user_ids: set[int] = set()
+            for user_id in user_ids:
+                try:
+                    normalized = int(user_id)
+                except (TypeError, ValueError):
+                    continue
+                if normalized <= 0 or normalized in seen_user_ids:
+                    continue
+                seen_user_ids.add(normalized)
+                socketio_instance.emit(event, body, room=f'user_{normalized}')
+                emitted = True
+
+        # Backward-compatible fallback.
+        if not emitted and broadcast:
+            socketio_instance.emit(event, body)
     
     @app.route('/')
     def index():
@@ -355,7 +372,8 @@ def register_routes(app):
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
 
-        sessions = list_active_device_sessions(session['user_id'])
+        include_expired = str(request.args.get('include_expired', '')).lower() in ('1', 'true', 'yes')
+        sessions = list_active_device_sessions(session['user_id'], include_expired=include_expired)
         current_session_id = int(session.get('device_session_id') or 0)
         for row in sessions:
             row['is_current'] = (row.get('id') == current_session_id)
@@ -568,7 +586,7 @@ def register_routes(app):
                     'action': 'room_created',
                     'by_user_id': int(session['user_id']),
                 },
-                broadcast=True,
+                user_ids=[int(uid) for uid in member_ids],
             )
             return jsonify({'success': True, 'room_id': room_id})
         except Exception as e:
@@ -667,9 +685,11 @@ def register_routes(app):
         valid_user_ids = [uid for uid in user_ids if get_user_by_id(uid)]
         
         added = 0
+        added_user_ids: list[int] = []
         for uid in valid_user_ids:
             if add_room_member(room_id, uid):
                 added += 1
+                added_user_ids.append(int(uid))
         
         if added > 0:
             _emit_socket_event(
@@ -689,7 +709,8 @@ def register_routes(app):
                     'action': 'members_invited',
                     'by_user_id': int(session['user_id']),
                 },
-                broadcast=True,
+                room_id=room_id,
+                user_ids=added_user_ids,
             )
             return jsonify({'success': True, 'added_count': added})
         return jsonify({'error': '이미 참여중인 사용자입니다.'}), 400
@@ -698,26 +719,35 @@ def register_routes(app):
     def leave_room_route(room_id):
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
-        
-        leave_room_db(room_id, session['user_id'])
+
+        if not is_room_member(room_id, session['user_id']):
+            return jsonify({'error': '대화방 접근 권한이 없습니다.'}), 403
+
+        left_user_id = int(session['user_id'])
+        success = leave_room_db(room_id, left_user_id)
+        if not success:
+            return jsonify({'error': '대화방 나가기에 실패했습니다.'}), 400
+
         _emit_socket_event(
             'room_members_updated',
             {
                 'room_id': room_id,
                 'action': 'member_left',
-                'user_id': int(session['user_id']),
-                'by_user_id': int(session['user_id']),
+                'user_id': left_user_id,
+                'by_user_id': left_user_id,
             },
             room_id=room_id,
+            user_ids=[left_user_id],
         )
         _emit_socket_event(
             'room_updated',
             {
                 'room_id': room_id,
                 'action': 'member_left',
-                'user_id': int(session['user_id']),
+                'user_id': left_user_id,
             },
-            broadcast=True,
+            room_id=room_id,
+            user_ids=[left_user_id],
         )
         return jsonify({'success': True})
     
@@ -726,7 +756,10 @@ def register_routes(app):
         """[v4.9] 관리자가 멤버를 강제 퇴장시키기"""
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
-        
+
+        if not is_room_member(room_id, session['user_id']):
+            return jsonify({'error': '대화방 접근 권한이 없습니다.'}), 403
+
         # 관리자 권한 확인
         if not is_room_admin(room_id, session['user_id']):
             return jsonify({'error': '관리자만 멤버를 퇴장시킬 수 있습니다.'}), 403
@@ -742,17 +775,22 @@ def register_routes(app):
         # 대상이 해당 방의 멤버인지 확인
         if not is_room_member(room_id, target_user_id):
             return jsonify({'error': '해당 사용자는 대화방 멤버가 아닙니다.'}), 400
-        
-        leave_room_db(room_id, target_user_id)
+
+        success = leave_room_db(room_id, target_user_id)
+        if not success:
+            return jsonify({'error': '강퇴 처리에 실패했습니다.'}), 400
+
+        actor_id = int(session['user_id'])
         _emit_socket_event(
             'room_members_updated',
             {
                 'room_id': room_id,
                 'action': 'member_kicked',
                 'user_id': int(target_user_id),
-                'by_user_id': int(session['user_id']),
+                'by_user_id': actor_id,
             },
             room_id=room_id,
+            user_ids=[int(target_user_id)],
         )
         _emit_socket_event(
             'room_updated',
@@ -760,9 +798,10 @@ def register_routes(app):
                 'room_id': room_id,
                 'action': 'member_kicked',
                 'user_id': int(target_user_id),
-                'by_user_id': int(session['user_id']),
+                'by_user_id': actor_id,
             },
-            broadcast=True,
+            room_id=room_id,
+            user_ids=[int(target_user_id)],
         )
         return jsonify({'success': True})
     
@@ -800,7 +839,7 @@ def register_routes(app):
                 'name': new_name,
                 'by_user_id': int(session['user_id']),
             },
-            broadcast=True,
+            room_id=room_id,
         )
         return jsonify({'success': True})
     
@@ -1490,6 +1529,8 @@ def register_routes(app):
     def set_admin_route(room_id):
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
+        if not is_room_member(room_id, session['user_id']):
+            return jsonify({'error': '접근 권한이 없습니다.'}), 403
         if not is_room_admin(room_id, session['user_id']):
             return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
         
@@ -1499,6 +1540,8 @@ def register_routes(app):
         
         if not target_user_id:
             return jsonify({'error': '사용자를 선택해주세요.'}), 400
+        if not is_room_member(room_id, int(target_user_id)):
+            return jsonify({'error': '해당 사용자는 대화방 멤버가 아닙니다.'}), 400
         
         # [v4.13] 마지막 관리자 해제 방지
         if not is_admin:
