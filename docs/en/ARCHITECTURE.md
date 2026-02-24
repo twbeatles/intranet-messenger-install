@@ -61,22 +61,31 @@ Keep existing features/business logic while removing browser dependency and movi
 - calls `DELETE /api/device-sessions/current`
 - removes local token
 
+4. Active session list (`GET /api/device-sessions`)
+- default returns active (non-expired) sessions only
+- `include_expired=1` includes expired sessions in the response
+
 ## Realtime Integrity Layer
 
 - Socket.IO `connect` rejects unauthenticated sessions
+- on successful connect, server joins a personal room (`user_{user_id}`) plus membership rooms (`room_{room_id}`)
 - `send_message`:
+  - client-allowed types are `text|file|image` (`system` is server-internal only)
   - validates same-room `reply_to`
+  - enforces DB idempotency using `room_id + sender_id + client_msg_id` unique key
   - validates `upload_token` for file/image types
   - returns ACK (`ok`, `message_id`/`error`)
-  - reflects optional `client_msg_id`
+  - duplicate retries return existing `message_id` ACK without re-insert/re-broadcast
 - `message_read`:
   - validates message-room consistency before update
-- On REST success paths, server emits canonical socket events directly for multi-client consistency
+- On REST success paths, server emits canonical socket events only to related rooms/users for multi-client consistency
 
 ## Desktop Reliability Layer
 
 - outbound typing with debounce (default 500ms)
-- pending/failed/retry UX for message delivery
+- text/file sends share one pending/failed/retry + ACK pipeline
+- own-message and own-typing checks are based on `user_id` (not nickname)
+- `read_updated`, `reaction_updated`, `message_edited`, `message_deleted` prefer incremental UI updates (fallback reload on miss)
 - settings UI supports update channel selection (`stable`/`canary`)
 
 ## Security / Operations Notes
@@ -84,6 +93,7 @@ Keep existing features/business logic while removing browser dependency and movi
 - Message E2E: v2 format with v1 compatibility
 - Server stores/relays encrypted content without plaintext decrypt
 - File message send requires `upload_token`
+- when room creator leaves, `created_by` is reassigned (remaining admin first, then member, else `NULL`)
 - Socket.IO CORS default is same-origin
 - `USE_HTTPS` default is environment-driven (`MESSENGER_ENV`, `USE_HTTPS`) for production safety
 

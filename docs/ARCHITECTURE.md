@@ -59,22 +59,31 @@
 - `DELETE /api/device-sessions/current` 호출
 - 로컬 토큰 삭제
 
+4. 활성 세션 조회(`GET /api/device-sessions`)
+- 기본은 미만료(active) 세션만 반환
+- `include_expired=1` 지정 시 만료 세션 포함 반환
+
 ## 실시간 정합성 계층
 
 - Socket.IO 연결 시 인증 세션이 없으면 `connect` 즉시 거부
+- Socket `connect` 성공 시 사용자 전용 룸(`user_{user_id}`) + 소속 방 룸(`room_{room_id}`) join
 - `send_message`:
+  - 클라이언트 허용 타입은 `text|file|image` (`system`은 서버 내부 전용)
   - `reply_to`는 동일 방 메시지인지 검증
+  - `client_msg_id` 기준 DB idempotency (`room_id + sender_id + client_msg_id` unique)
   - 파일/이미지는 `upload_token` 검증 후 처리
   - ACK 응답(`ok`, `message_id`/`error`) 제공
-  - `client_msg_id` 반사 지원
+  - 중복 재전송은 기존 `message_id`로 ACK하고 재삽입/재중계는 하지 않음
 - `message_read`:
   - `message_id`와 `room_id` 정합성 검증 후 읽음 반영
-- REST 성공 시 서버가 canonical socket 이벤트를 직접 emit하여 다중 클라이언트 동기화 보장
+- REST 성공 시 서버가 canonical socket 이벤트를 관련 방/사용자에게만 emit하여 다중 클라이언트 동기화 보장
 
 ## 데스크톱 신뢰성 계층
 
 - 입력창 `typing` 이벤트 debounce 송신(기본 500ms)
-- 메시지 송신 pending/failed/retry UI 상태 제공
+- 텍스트/파일 모두 메시지 송신 pending/failed/retry + ACK 파이프라인으로 처리
+- 메시지/타이핑 본인 판별은 닉네임이 아니라 `user_id` 기준으로 처리
+- `read_updated`, `reaction_updated`, `message_edited`, `message_deleted`는 증분 반영 우선(실패 시 fallback reload)
 - 설정에서 업데이트 채널(`stable`/`canary`) 선택 지원
 
 ## 보안/운영 포인트
@@ -82,6 +91,7 @@
 - 메시지 E2E: `v2` 포맷 + `v1` 호환
 - 서버는 메시지 평문 복호화 없이 저장/중계
 - 파일 메시지 전송은 `upload_token` 검증 필수
+- 방 생성자 퇴장 시 `created_by`는 남은 관리자 우선, 없으면 멤버에게 재할당(없으면 `NULL`)
 - Socket.IO CORS는 기본 동일 출처 정책
 - 운영 환경에서 `USE_HTTPS` 기본값은 환경변수(`MESSENGER_ENV`, `USE_HTTPS`) 기반으로 결정
 

@@ -162,3 +162,70 @@ def test_rest_room_rename_emits_socket_event(app):
     finally:
         sc.disconnect()
 
+
+def test_client_cannot_send_system_message_type(app):
+    client = app.test_client()
+    _register(client, 'systemguard')
+    _login(client, 'systemguard')
+
+    room_id = _create_room(client, 'System Guard Room')
+    sc = _socket_client(app, client)
+    assert sc.is_connected()
+    try:
+        ack = sc.emit(
+            'send_message',
+            {
+                'room_id': room_id,
+                'content': 'fake system',
+                'type': 'system',
+                'encrypted': False,
+            },
+            callback=True,
+        )
+        assert isinstance(ack, dict)
+        assert ack.get('ok') is False
+        assert '잘못된 요청' in str(ack.get('error') or '')
+
+        events = sc.get_received()
+        assert any(evt['name'] == 'error' for evt in events)
+        assert not any(evt['name'] == 'new_message' for evt in events)
+    finally:
+        sc.disconnect()
+
+
+def test_room_updated_not_emitted_to_unrelated_user(app):
+    from app import socketio
+
+    owner_client = app.test_client()
+    outsider_client = app.test_client()
+
+    _register(owner_client, 'roomscope_owner')
+    _register(owner_client, 'roomscope_member')
+    _register(owner_client, 'roomscope_outsider')
+
+    _login(owner_client, 'roomscope_owner')
+    users = owner_client.get('/api/users').json
+    member = next(u for u in users if u['username'] == 'roomscope_member')
+    created = owner_client.post('/api/rooms', json={'name': 'Scope Room', 'members': [member['id']]})
+    assert created.status_code == 200
+    room_id = int(created.json['room_id'])
+
+    owner_socket = socketio.test_client(app, flask_test_client=owner_client)
+    assert owner_socket.is_connected()
+    owner_socket.get_received()
+
+    _login(outsider_client, 'roomscope_outsider')
+    outsider_socket = socketio.test_client(app, flask_test_client=outsider_client)
+    assert outsider_socket.is_connected()
+    outsider_socket.get_received()
+
+    rename = owner_client.put(f'/api/rooms/{room_id}/name', json={'name': 'Scope Room Renamed'})
+    assert rename.status_code == 200
+
+    owner_events = owner_socket.get_received()
+    outsider_events = outsider_socket.get_received()
+    assert any(evt['name'] == 'room_updated' for evt in owner_events)
+    assert not any(evt['name'] == 'room_updated' for evt in outsider_events)
+
+    owner_socket.disconnect()
+    outsider_socket.disconnect()

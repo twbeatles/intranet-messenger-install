@@ -121,3 +121,37 @@ def test_revoke_other_device_session_by_id(client):
     # old one can already be revoked by rotation. Either not found or success is acceptable.
     assert revoke_old.status_code in (200, 404)
 
+
+def test_list_device_sessions_defaults_to_active_only(client):
+    from app.models.base import get_db
+
+    _register(client, 'ds_user_expired')
+    created = client.post(
+        '/api/device-sessions',
+        json={
+            'username': 'ds_user_expired',
+            'password': 'Password123!',
+            'device_name': 'expiring-device',
+            'remember': True,
+        },
+    )
+    assert created.status_code == 200
+    session_id = int(created.json['device_session_id'])
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE device_sessions SET expires_at = '2000-01-01 00:00:00' WHERE id = ?",
+        (session_id,),
+    )
+    conn.commit()
+
+    listing_default = client.get('/api/device-sessions')
+    assert listing_default.status_code == 200
+    assert listing_default.json.get('sessions') == []
+
+    listing_all = client.get('/api/device-sessions?include_expired=1')
+    assert listing_all.status_code == 200
+    sessions = listing_all.json.get('sessions') or []
+    assert len(sessions) == 1
+    assert int(sessions[0].get('is_expired') or 0) == 1

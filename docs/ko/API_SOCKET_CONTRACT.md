@@ -63,7 +63,9 @@
 - 현재 디바이스 세션 폐기
 
 4. `GET /api/device-sessions`
-- 현재 사용자 활성 디바이스 목록
+- 기본: 현재 사용자 **활성(미만료) + 미폐기** 디바이스 목록
+- 쿼리: `include_expired=1|true|yes` 를 주면 만료 세션도 포함
+- 응답 세션 항목: `is_expired` 포함
 
 5. `DELETE /api/device-sessions/<id>`
 - 특정 디바이스 세션 강제 로그아웃
@@ -162,7 +164,7 @@
 {
   "room_id": 12,
   "content": "message or cipher text",
-  "type": "text|file|image|system",
+  "type": "text|file|image",
   "encrypted": true,
   "reply_to": 123,
   "upload_token": "optional-for-file",
@@ -173,29 +175,38 @@
 ### 서버 검증
 
 - 인증 세션 없는 소켓 연결/송신 거부
+- 클라이언트 입력 `type=system`은 즉시 거부(서버 내부 이벤트 전용 타입)
 - `reply_to`는 동일 `room_id` 메시지만 허용
 - 파일/이미지는 `upload_token` 필수
 - 잘못된 방 접근, 잘못된 payload 차단
+- `client_msg_id`가 있으면 `(room_id, sender_id, client_msg_id)` 기준 idempotency 적용
 
 ### ACK 응답 (Socket callback)
 
 - 성공: `{ "ok": true, "message_id": 456 }`
 - 실패: `{ "ok": false, "error": "..." }`
+- 중복 재전송(`client_msg_id` 동일): 기존 `message_id`로 `ok=true` 반환, 재삽입/재중계 없음
 
 ### `new_message` 반사 필드
 
 - `client_msg_id`가 요청에 있으면 브로드캐스트 payload에도 포함
 - 클라이언트는 이를 이용해 pending 메시지와 매칭 가능
 
+## 소켓 이벤트 전파 범위
+
+- 전역 브로드캐스트를 기본 경로로 사용하지 않고, `room_{room_id}` / `user_{user_id}` 타겟 emit을 사용합니다.
+- 소켓 `connect` 시 서버는 사용자 전용 룸 `user_{user_id}`와 사용자가 속한 `room_{id}`를 join합니다.
+- `room_updated`류 이벤트는 관련 방 멤버 및 당사자 사용자에게만 전달됩니다.
+
 ## REST -> Socket canonical 브릿지
 
-다음 REST 성공 시 서버가 소켓 이벤트를 직접 emit합니다.
+다음 REST 성공 시 서버가 소켓 이벤트를 직접 emit합니다(관련 방/사용자 범위로 한정).
 
-- `POST /api/rooms` -> `room_updated(action=room_created)`
-- `POST /api/rooms/<room_id>/members` -> `room_members_updated`, `room_updated`
-- `POST /api/rooms/<room_id>/leave` -> `room_members_updated`, `room_updated`
-- `DELETE /api/rooms/<room_id>/members/<target_user_id>` -> `room_members_updated`, `room_updated`
-- `PUT /api/rooms/<room_id>/name` -> `room_name_updated`, `room_updated`
+- `POST /api/rooms` -> `room_updated(action=room_created)` (신규 멤버 `user_{id}` 대상)
+- `POST /api/rooms/<room_id>/members` -> `room_members_updated`, `room_updated` (기존 방 + 초대 대상 `user_{id}`)
+- `POST /api/rooms/<room_id>/leave` -> `room_members_updated`, `room_updated` (기존 방 + 퇴장 당사자 `user_{id}`)
+- `DELETE /api/rooms/<room_id>/members/<target_user_id>` -> `room_members_updated`, `room_updated` (기존 방 + 강퇴 당사자 `user_{id}`)
+- `PUT /api/rooms/<room_id>/name` -> `room_name_updated`, `room_updated` (해당 방)
 - `POST /api/rooms/<room_id>/pins` / `DELETE /api/rooms/<room_id>/pins/<pin_id>` -> `pin_updated`
 - `POST /api/rooms/<room_id>/polls` -> `poll_created`
 - `POST /api/polls/<poll_id>/vote` / `POST /api/polls/<poll_id>/close` -> `poll_updated`
@@ -205,6 +216,7 @@
 
 - 소켓 `connect`에서 인증 세션 필수
 - `message_read`는 `message_id`가 해당 `room_id` 소속인지 검증
+- `POST /api/rooms/<room_id>/leave`는 멤버십이 없으면 `403`이며, 실제 퇴장 성공 시에만 소켓 이벤트 emit
 - 메시지 조회 SQL의 답장 JOIN은 동일 방(`rm.room_id = m.room_id`)으로 제한
 
 ## 버전 호환

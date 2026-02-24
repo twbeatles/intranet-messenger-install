@@ -63,7 +63,9 @@
 - revoke current device session
 
 4. `GET /api/device-sessions`
-- list active device sessions for current user
+- default: list only non-expired and non-revoked sessions for current user
+- query: pass `include_expired=1|true|yes` to include expired sessions
+- each session row includes `is_expired`
 
 5. `DELETE /api/device-sessions/<id>`
 - force logout a specific device session
@@ -162,7 +164,7 @@
 {
   "room_id": 12,
   "content": "message or cipher text",
-  "type": "text|file|image|system",
+  "type": "text|file|image",
   "encrypted": true,
   "reply_to": 123,
   "upload_token": "optional-for-file",
@@ -173,29 +175,38 @@
 ### Server validation
 
 - reject unauthenticated socket connection/send
+- reject client-originated `type=system` immediately (`system` is server-internal only)
 - `reply_to` must reference a message in the same `room_id`
 - `upload_token` required for file/image messages
 - reject invalid room access or malformed payload
+- apply idempotency on `(room_id, sender_id, client_msg_id)` when `client_msg_id` exists
 
 ### ACK response (socket callback)
 
 - success: `{ "ok": true, "message_id": 456 }`
 - failure: `{ "ok": false, "error": "..." }`
+- duplicate retry (same `client_msg_id`): return existing `message_id` with `ok=true`, without re-insert/re-broadcast
 
 ### `new_message` reflected field
 
 - if request includes `client_msg_id`, broadcast payload includes the same value
 - clients can match pending local messages with server-confirmed messages
 
+## Socket Event Delivery Scope
+
+- Global broadcast is not used as the default path; events are emitted to `room_{room_id}` and/or `user_{user_id}` targets.
+- On socket `connect`, server joins `user_{user_id}` plus all membership rooms `room_{id}`.
+- `room_updated` family events are sent only to related room members and direct target users.
+
 ## REST -> Socket Canonical Bridge
 
-On successful REST operations, server emits canonical socket events directly:
+On successful REST operations, server emits canonical socket events directly (scoped to related rooms/users):
 
-- `POST /api/rooms` -> `room_updated(action=room_created)`
-- `POST /api/rooms/<room_id>/members` -> `room_members_updated`, `room_updated`
-- `POST /api/rooms/<room_id>/leave` -> `room_members_updated`, `room_updated`
-- `DELETE /api/rooms/<room_id>/members/<target_user_id>` -> `room_members_updated`, `room_updated`
-- `PUT /api/rooms/<room_id>/name` -> `room_name_updated`, `room_updated`
+- `POST /api/rooms` -> `room_updated(action=room_created)` (to created member `user_{id}` targets)
+- `POST /api/rooms/<room_id>/members` -> `room_members_updated`, `room_updated` (existing room + invited `user_{id}`)
+- `POST /api/rooms/<room_id>/leave` -> `room_members_updated`, `room_updated` (existing room + leaving `user_{id}`)
+- `DELETE /api/rooms/<room_id>/members/<target_user_id>` -> `room_members_updated`, `room_updated` (existing room + kicked `user_{id}`)
+- `PUT /api/rooms/<room_id>/name` -> `room_name_updated`, `room_updated` (room only)
 - `POST /api/rooms/<room_id>/pins` / `DELETE /api/rooms/<room_id>/pins/<pin_id>` -> `pin_updated`
 - `POST /api/rooms/<room_id>/polls` -> `poll_created`
 - `POST /api/polls/<poll_id>/vote` / `POST /api/polls/<poll_id>/close` -> `poll_updated`
@@ -205,6 +216,7 @@ On successful REST operations, server emits canonical socket events directly:
 
 - socket `connect` requires authenticated session
 - `message_read` validates that `message_id` belongs to the given `room_id`
+- `POST /api/rooms/<room_id>/leave` returns `403` for non-members and emits socket events only on actual membership removal
 - reply JOIN in message queries is limited to same room (`rm.room_id = m.room_id`)
 
 ## Version Compatibility
