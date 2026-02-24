@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Intranet Messenger Client"
+    Manufacturer="Intranet"
+    Version="1.0.0"
+    UpgradeCode="8D9E130B-A3A8-47C8-8FC6-7D1D3F9F73B2">
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainFeature" Title="Desktop Client" Level="1">
+      <ComponentGroupRef Id="ClientFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="Intranet Messenger Client" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ClientFiles" Directory="INSTALLFOLDER">
+      <!-- Replace with harvested files: HeatDirectory output -->
+      <Component Id="ClientExeComponent" Guid="A6E8D1D3-FD99-4F77-B0C8-5DECF53F8F4B">
+        <File Id="ClientExe" Source="$(var.ClientBuildDir)\MessengerClient.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>
+

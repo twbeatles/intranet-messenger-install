@@ -1,0 +1,22 @@
+{
+  "errors.auth.login_required": "로그인이 필요합니다.",
+  "errors.auth.invalid_credentials": "아이디 또는 비밀번호가 올바르지 않습니다.",
+  "errors.auth.token_required": "device_token이 필요합니다.",
+  "errors.auth.token_invalid_or_expired": "유효하지 않거나 만료된 토큰입니다.",
+  "errors.auth.user_not_found": "사용자를 찾을 수 없습니다.",
+  "errors.room.access_denied": "대화방 접근 권한이 없습니다.",
+  "errors.room.not_found": "대화방을 찾을 수 없습니다.",
+  "errors.room.invalid_room_id": "잘못된 대화방 ID입니다.",
+  "errors.room.admin_required": "관리자 권한이 필요합니다.",
+  "errors.request.invalid": "잘못된 요청입니다.",
+  "errors.request.invalid_format": "잘못된 요청 형식입니다.",
+  "errors.message.save_failed": "메시지 저장에 실패했습니다.",
+  "errors.message.send_failed": "메시지 전송에 실패했습니다.",
+  "errors.message.edit_failed": "메시지 수정에 실패했습니다.",
+  "errors.message.delete_failed": "메시지 삭제에 실패했습니다.",
+  "errors.upload.token_required": "업로드 토큰이 필요합니다.",
+  "errors.upload.token_used_or_expired": "업로드 토큰이 이미 사용되었거나 만료되었습니다.",
+  "errors.file.not_found": "파일을 찾을 수 없습니다.",
+  "errors.file.invalid_metadata": "잘못된 파일 메타데이터입니다.",
+  "errors.generic": "요청을 처리할 수 없습니다."
+}

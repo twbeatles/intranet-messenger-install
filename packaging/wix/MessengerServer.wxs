@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Intranet Messenger Server"
+    Manufacturer="Intranet"
+    Version="1.0.0"
+    UpgradeCode="396B9C9F-A9B8-4DCE-8BA4-CE7FF0F7D4C9">
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainFeature" Title="Server" Level="1">
+      <ComponentGroupRef Id="ServerFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="SERVERINSTALLFOLDER" Name="Intranet Messenger Server" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ServerFiles" Directory="SERVERINSTALLFOLDER">
+      <!-- Replace with harvested files: HeatDirectory output -->
+      <Component Id="ServerExeComponent" Guid="190CF9C3-422D-45E4-BD82-C1E2F5CF5F6E">
+        <File Id="ServerExe" Source="$(var.ServerBuildDir)\MessengerServer.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>
+

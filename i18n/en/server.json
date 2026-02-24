@@ -1,0 +1,22 @@
+{
+  "errors.auth.login_required": "Login required.",
+  "errors.auth.invalid_credentials": "Invalid username or password.",
+  "errors.auth.token_required": "device_token is required.",
+  "errors.auth.token_invalid_or_expired": "Token is invalid or expired.",
+  "errors.auth.user_not_found": "User not found.",
+  "errors.room.access_denied": "Access to this room is denied.",
+  "errors.room.not_found": "Room not found.",
+  "errors.room.invalid_room_id": "Invalid room ID.",
+  "errors.room.admin_required": "Administrator privilege is required.",
+  "errors.request.invalid": "Invalid request.",
+  "errors.request.invalid_format": "Invalid request format.",
+  "errors.message.save_failed": "Failed to save message.",
+  "errors.message.send_failed": "Failed to send message.",
+  "errors.message.edit_failed": "Failed to edit message.",
+  "errors.message.delete_failed": "Failed to delete message.",
+  "errors.upload.token_required": "Upload token is required.",
+  "errors.upload.token_used_or_expired": "Upload token is already used or expired.",
+  "errors.file.not_found": "File not found.",
+  "errors.file.invalid_metadata": "Invalid file metadata.",
+  "errors.generic": "Unable to process request."
+}
