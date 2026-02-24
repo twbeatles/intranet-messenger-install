@@ -10,7 +10,8 @@
   - 서버: `app/routes.py`, `app/sockets.py`, `app/models/*`
   - 데스크톱: `client/app_controller.py`, `client/ui/*`, `client/services/*`
 - 현재 테스트 상태:
-  - `pytest tests -q` 통과 (`92 passed`)
+  - 최초 점검 시점: `pytest tests -q` 통과 (`92 passed`)
+  - 후속 반영 완료 후: `pytest tests -q` 통과 (`99 passed`)
 
 ## 1) 핵심 결론
 
@@ -18,6 +19,24 @@
 - 특히 아래 2건은 우선 보완이 필요합니다.
   - **비인증 소켓 연결 허용**
   - **답장(reply_to) 참조를 통한 타 방 메시지 메타 노출 가능성**
+
+## 1-1) 후속 반영 상태 (2026-02-24 업데이트)
+
+- 아래 항목은 코드 반영 완료:
+  - [x] Critical-1: 비인증 소켓 연결 차단
+  - [x] Critical-2: `reply_to` 동일 방 무결성 + 조회 JOIN 방 제한
+  - [x] High-1: `message_read` 메시지-방 정합성 검증
+  - [x] High-2: REST 성공 시 canonical socket emit 브릿지 추가
+  - [x] High-3: 데스크톱 기능 동등성(UI 연결) 보강
+  - [x] High-4: 타이핑 송신 debounce 연결
+  - [x] Medium-1: SessionStore keyring/fallback 일관성 수정
+  - [x] Medium-2: 내부 예외 문자열 사용자 응답 노출 제거
+  - [x] Medium-3: 운영 환경 HTTPS 기본값 보강
+  - [x] Medium-4: 업데이트 채널(stable/canary) 설정 UI 추가
+  - [x] Medium-5: ACK/pending/failed/retry 전송 UX 반영
+- 추가 회귀 테스트 반영:
+  - `tests/test_socket_security_regressions.py`
+  - `tests/test_session_store_fallback.py`
 
 ## 2) 우선순위 이슈 (심각도 순)
 

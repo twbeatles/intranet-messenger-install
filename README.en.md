@@ -28,6 +28,7 @@ python -m client.main --server-url http://127.0.0.1:5000
 - Documentation hub: `docs/README.md`
 - Korean docs index: `docs/ko/README.md`
 - English docs index: `docs/en/README.md`
+- Consistency audit (KO/EN): `docs/ko/CONSISTENCY_AUDIT_20260224.md`, `docs/en/CONSISTENCY_AUDIT_20260224.md`
 - Root build/deploy guide: `BUILD_DEPLOY_GUIDE.md`
 - Session guides: `claude.md`, `gemini.md`
 

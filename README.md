@@ -28,6 +28,7 @@ python -m client.main --server-url http://127.0.0.1:5000
 - 문서 허브: `docs/README.md`
 - 한국어 문서 인덱스: `docs/ko/README.md`
 - 영어 문서 인덱스: `docs/en/README.md`
+- 정합성 점검 보고서(KO/EN): `docs/ko/CONSISTENCY_AUDIT_20260224.md`, `docs/en/CONSISTENCY_AUDIT_20260224.md`
 - 루트 빌드/배포 가이드: `BUILD_DEPLOY_GUIDE.md`
 - 세션 가이드: `claude.md`, `gemini.md`
 

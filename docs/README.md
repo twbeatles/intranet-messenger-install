@@ -10,6 +10,7 @@
 - `docs/ko/BUILD_EXE_GUIDE.md`
 - `docs/ko/USAGE_SERVER_CLIENT.md`
 - `docs/ko/API_SOCKET_CONTRACT.md`
+- `docs/ko/CONSISTENCY_AUDIT_20260224.md`
 - `docs/ko/OPERATIONS_RUNBOOK.md`
 - `docs/ko/CUTOVER_ROLLBACK.md`
 - `docs/ko/BACKUP_CLEANUP_20260223.md`
@@ -22,6 +23,7 @@
 - `docs/en/BUILD_EXE_GUIDE.md`
 - `docs/en/USAGE_SERVER_CLIENT.md`
 - `docs/en/API_SOCKET_CONTRACT.md`
+- `docs/en/CONSISTENCY_AUDIT_20260224.md`
 - `docs/en/OPERATIONS_RUNBOOK.md`
 - `docs/en/CUTOVER_ROLLBACK.md`
 - `docs/en/BACKUP_CLEANUP_20260223.md`

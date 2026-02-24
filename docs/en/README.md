@@ -7,6 +7,7 @@
 - [BUILD_EXE_GUIDE.md](./BUILD_EXE_GUIDE.md): server/client EXE build
 - [USAGE_SERVER_CLIENT.md](./USAGE_SERVER_CLIENT.md): server/client operation guide
 - [API_SOCKET_CONTRACT.md](./API_SOCKET_CONTRACT.md): REST/Socket contract summary
+- [CONSISTENCY_AUDIT_20260224.md](./CONSISTENCY_AUDIT_20260224.md): doc-code consistency audit and applied changes
 - [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md): operation checks and incident response
 - [CUTOVER_ROLLBACK.md](./CUTOVER_ROLLBACK.md): cutover/rollback plan
 - [BACKUP_CLEANUP_20260223.md](./BACKUP_CLEANUP_20260223.md): cleanup backup record

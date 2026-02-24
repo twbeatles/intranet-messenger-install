@@ -65,5 +65,24 @@
   - `tests/test_device_session_cleanup.py`
 - 검증:
   - `python -m compileall app client gui` 통과
-  - `pytest tests -q` 통과 (`87 passed`)
+  - `pytest tests -q` 통과 (`99 passed`)
   - `scripts/rehearse_rollback.ps1` 통과
+
+## 2026-02-24 정합성 보강(추가)
+
+- [x] 비인증 소켓 연결 차단 (`connect` 인증 필수)
+- [x] `reply_to` 교차 방 참조 차단 + 동일 방 JOIN 제한
+- [x] `message_read` 메시지-방 정합성 검증
+- [x] REST 성공 경로의 canonical socket emit 브릿지 보강
+  - 방/멤버/이름/공지/투표/관리자 변경 이벤트
+- [x] 데스크톱 기능 동등성 보강
+  - 방 생성/초대/이름변경/나가기/프로필 편집 UI 연결
+- [x] 타이핑 송신 debounce 경로 연결
+- [x] 메시지 송신 ACK/pending/failed/retry UX 반영
+- [x] 설정 UI 업데이트 채널(`stable`/`canary`) 추가
+- [x] SessionStore keyring/fallback 일관성 수정
+- [x] 내부 예외 문자열 사용자 응답 노출 제거
+- [x] 운영 환경 HTTPS 기본값을 환경변수 기반으로 보강
+- [x] 회귀 테스트 추가
+  - `tests/test_socket_security_regressions.py`
+  - `tests/test_session_store_fallback.py`
