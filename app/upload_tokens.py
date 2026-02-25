@@ -32,24 +32,43 @@ def _safe_file_delete(path: str) -> bool:
 
 
 def _get_upload_folder() -> str:
-    try:
-        from flask import current_app
+    fallback = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads')
+    candidates: list[str] = []
 
-        folder = str(current_app.config.get('UPLOAD_FOLDER') or '').strip()
-        if folder:
-            return folder
-    except Exception:
-        pass
-
+    # 테스트/스크립트 환경에서는 config 모듈 값이 가장 신뢰 가능하다.
     try:
         import config  # type: ignore
 
         folder = str(getattr(config, 'UPLOAD_FOLDER', '') or '').strip()
         if folder:
-            return folder
+            candidates.append(folder)
     except Exception:
         pass
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads')
+
+    try:
+        from flask import current_app
+
+        folder = str(current_app.config.get('UPLOAD_FOLDER') or '').strip()
+        if folder:
+            candidates.append(folder)
+    except Exception:
+        pass
+
+    candidates.append(fallback)
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for folder in candidates:
+        real_folder = os.path.realpath(os.path.abspath(folder))
+        if real_folder in seen:
+            continue
+        seen.add(real_folder)
+        normalized.append(real_folder)
+
+    for folder in normalized:
+        if os.path.isdir(folder):
+            return folder
+    return normalized[0] if normalized else os.path.realpath(os.path.abspath(fallback))
 
 
 def _now_ts() -> str:

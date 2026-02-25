@@ -108,6 +108,17 @@ socketio = None
 def create_app():
     """Flask 앱 팩토리"""
     global socketio
+
+    # 테스트/런타임에서 config가 동적으로 바뀌는 경우를 반영한다.
+    runtime_upload_folder = UPLOAD_FOLDER
+    try:
+        import config as runtime_config  # type: ignore
+
+        runtime_upload_folder = str(
+            getattr(runtime_config, 'UPLOAD_FOLDER', runtime_upload_folder) or runtime_upload_folder
+        )
+    except Exception:
+        pass
     
     # Static/Template 폴더 설정 (config에서 가져옴)
     static_folder = STATIC_FOLDER
@@ -118,8 +129,8 @@ def create_app():
         os.makedirs(static_folder, exist_ok=True)
     if not os.path.exists(template_folder):
         os.makedirs(template_folder, exist_ok=True)
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    os.makedirs(os.path.join(UPLOAD_FOLDER, 'profiles'), exist_ok=True)  # 프로필 이미지 폴더
+    os.makedirs(runtime_upload_folder, exist_ok=True)
+    os.makedirs(os.path.join(runtime_upload_folder, 'profiles'), exist_ok=True)  # 프로필 이미지 폴더
     
     # Flask 앱 생성
     app = Flask(
@@ -153,7 +164,7 @@ def create_app():
             f.write(new_salt)
         app.config['PASSWORD_SALT'] = new_salt
     
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    app.config['UPLOAD_FOLDER'] = runtime_upload_folder
     app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
     app.config['SESSION_COOKIE_SECURE'] = USE_HTTPS  # HTTPS일 때만 True
     app.config['SESSION_COOKIE_HTTPONLY'] = True
