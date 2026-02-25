@@ -140,7 +140,7 @@ class MessengerAppController(QObject):
         self.socket.on('connect', lambda _: self.main_window.set_connected(True))
         self.socket.on('disconnect', lambda _: self.main_window.set_connected(False))
         self.socket.on('new_message', self._on_socket_new_message)
-        self.socket.on('room_updated', lambda _: self._schedule_rooms_reload(150))
+        self.socket.on('room_updated', self._on_socket_room_updated)
         self.socket.on('room_name_updated', self._on_socket_room_name_updated)
         self.socket.on('room_members_updated', self._on_socket_room_members_updated)
         self.socket.on('read_updated', self._on_socket_read_updated)
@@ -656,11 +656,59 @@ class MessengerAppController(QObject):
         self._update_room_cache_name(room_id, str(payload.get('name') or ''))
         self.main_window.set_rooms(self.rooms_cache)
 
+    def _on_socket_room_updated(self, payload: dict[str, Any]) -> None:
+        action = str(payload.get('action') or '').strip().lower()
+        room_id = self._extract_room_id(payload)
+        current_user_id = int((self.current_user or {}).get('id') or 0)
+        try:
+            affected_user_id = int(payload.get('user_id') or 0)
+        except (TypeError, ValueError):
+            affected_user_id = 0
+
+        # room_name_updated 이벤트에서 이미 캐시를 즉시 갱신하므로 중복 re-fetch를 피한다.
+        if action == 'room_renamed':
+            return
+
+        # 멤버십 변경은 room_members_updated에서 처리하므로 중복 방 목록 조회를 줄인다.
+        if action in ('members_invited', 'member_left', 'member_kicked'):
+            if affected_user_id > 0 and affected_user_id == current_user_id:
+                self._schedule_rooms_reload(120)
+            return
+
+        if action == 'room_created':
+            self._schedule_rooms_reload(120)
+            return
+
+        # 알 수 없는 action은 안전하게 debounce reload.
+        self._schedule_rooms_reload(180)
+
     def _on_socket_room_members_updated(self, payload: dict[str, Any]) -> None:
         room_id = self._extract_room_id(payload)
+        action = str(payload.get('action') or '').strip().lower()
+        current_user_id = int((self.current_user or {}).get('id') or 0)
+        try:
+            affected_user_id = int(payload.get('user_id') or 0)
+        except (TypeError, ValueError):
+            affected_user_id = 0
+
+        # 내가 현재 방에서 제거된 경우 즉시 UI 선택 상태를 정리하고 목록만 갱신한다.
+        if (
+            room_id
+            and self.current_room_id == room_id
+            and action in ('member_left', 'member_kicked')
+            and affected_user_id > 0
+            and affected_user_id == current_user_id
+        ):
+            self.current_room_id = None
+            self.current_room_key = ''
+            self.current_room_members = []
+            self.main_window.clear_room_selection()
+            self._schedule_rooms_reload(120)
+            return
+
         if room_id and self.current_room_id == room_id:
             self._reload_current_room_messages(silent=True, refresh_admins=True)
-        self._schedule_rooms_reload(200)
+        self._schedule_rooms_reload(220 if action == 'members_invited' else 200)
 
     def _on_socket_read_updated(self, payload: dict[str, Any]) -> None:
         room_id = self._extract_room_id(payload)

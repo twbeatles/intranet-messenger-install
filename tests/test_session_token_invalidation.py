@@ -36,3 +36,37 @@ def test_password_change_invalidates_other_logged_in_sessions(app):
     invalidated = client_b.get('/api/users')
     assert invalidated.status_code == 401
     assert '세션이 만료' in str(invalidated.json.get('error') or '')
+
+
+def test_uploads_respects_session_token_invalidation(app):
+    client_a = app.test_client()
+    client_b = app.test_client()
+
+    register = client_a.post(
+        '/api/register',
+        json={
+            'username': 'token_guard_up',
+            'password': 'Password123!',
+            'nickname': 'Token Guard Upload',
+        },
+    )
+    assert register.status_code == 200
+
+    login_a = client_a.post('/api/login', json={'username': 'token_guard_up', 'password': 'Password123!'})
+    login_b = client_b.post('/api/login', json={'username': 'token_guard_up', 'password': 'Password123!'})
+    assert login_a.status_code == 200
+    assert login_b.status_code == 200
+
+    change = client_a.put(
+        '/api/me/password',
+        json={
+            'current_password': 'Password123!',
+            'new_password': 'Password456!',
+        },
+    )
+    assert change.status_code == 200
+    assert change.json.get('success') is True
+
+    invalidated_upload = client_b.get('/uploads/notfound.png')
+    assert invalidated_upload.status_code == 401
+    assert '세션이 만료' in str(invalidated_upload.json.get('error') or '')

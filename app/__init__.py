@@ -264,7 +264,7 @@ def create_app():
         if not user_id:
             return None
         path = request.path or ''
-        if path.startswith('/static/') or path.startswith('/uploads/'):
+        if path.startswith('/static/'):
             return None
 
         try:

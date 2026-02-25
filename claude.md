@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-02-24
+최종 업데이트: 2026-02-25
 
 ## 1) 목적
 
@@ -11,8 +11,8 @@
 
 1. `README.md`
 2. `README.en.md`
-3. `TRANSITION_CHECKLIST.md`
-4. `FUNCTIONAL_REVIEW_20260223.md`
+3. `TRANSITION_CHECKLIST.md` (deprecated, 대체: `docs/CUTOVER_ROLLBACK.md`, `docs/OPERATIONS_RUNBOOK.md`)
+4. `FUNCTIONAL_REVIEW_20260223.md` (deprecated, 대체: `IMPLEMENTATION_RISK_AUDIT_20260225.md`)
 5. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
 6. 관련 구현 파일(작업 범위별):
    - 서버: `app/routes.py`, `app/sockets.py`, `app/models/*`
@@ -23,9 +23,9 @@
 
 - 제품 방향: Desktop-First (Windows 설치형 클라이언트 중심)
 - 아키텍처: `Flask + Socket.IO + SQLite` 서버 + `PySide6` 클라이언트
-- 최신 검증(2026-02-23):
-  - `pytest tests -q` -> `74 passed`
-  - `pytest --maxfail=1` -> `74 passed`
+- 최신 검증(2026-02-25):
+  - `pytest tests -q` -> `116 passed`
+  - `pytest --maxfail=1` -> `116 passed`
 - i18n 적용 기준:
   - 기본 로케일: `ko-KR`
   - 지원 로케일: `en-US`
@@ -91,13 +91,13 @@
 
 ## 5) 현재 오픈 이슈 (다음 구현 시 우선 점검)
 
-우선순위가 높은 미해결 항목은 `FUNCTIONAL_REVIEW_20260223.md` 기준으로 관리:
+우선순위가 높은 미해결 항목은 `IMPLEMENTATION_RISK_AUDIT_20260225.md` 기준으로 관리:
 
-1. 시작프로그램 설정이 앱 시작 시 강제로 ON 되는 문제
-2. `remember=False` 세션 정책이 refresh 시 장기화되는 문제
-3. 암호화 메시지 길이 처리(서버 절단 가능성) 점검
-4. 소켓 실시간 동기화 확장(edited/deleted/read/typing/pin/admin/poll)
-5. 메시지 수신 시 rooms 전체 재조회 성능 개선
+1. 업로드 토큰 정리 주기/보관 정책 운영값 확정
+2. orphan 파일 정리 작업의 운영 모니터링 지표 추가
+3. 확장 파일 시그니처 검증의 오탐/누락 관찰 및 정책 보정
+4. `room_updated` 증분 업데이트 고도화(추가 API 호출 축소)
+5. 릴리즈 시 문서 테스트 수치/날짜 동기화 유지
 
 ## 6) 작업 원칙
 
@@ -132,7 +132,7 @@
 아래를 새 세션 첫 메시지로 사용:
 
 ```text
-Read `claude.md`, `README.md`, and `FUNCTIONAL_REVIEW_20260223.md` first.
+Read `claude.md`, `README.md`, and `IMPLEMENTATION_RISK_AUDIT_20260225.md` first.
 Then summarize:
 1) current baseline (tests/contracts),
 2) risks for this change area,

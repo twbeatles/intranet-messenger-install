@@ -158,42 +158,68 @@ def validate_file_header(file):
     """[v4.3] 파일 매직 넘버(헤더) 검증 - 보안 강화"""
     filename = file.filename.lower()
     ext = filename.rsplit('.', 1)[1] if '.' in filename else ''
-    
-    # 헤더 시그니처 정의
+
+    if ext not in ALLOWED_EXTENSIONS:
+        return False
+
+    start_pos = file.tell()
+    try:
+        file.seek(0)
+        header = file.read(64)
+        file.seek(0)
+        text_sample = file.read(2048)
+    finally:
+        file.seek(start_pos)
+
+    # 고정 시그니처 기반 파일
     signatures = {
-        'png': b'\x89PNG\r\n\x1a\n',
-        'jpg': b'\xff\xd8',
-        'jpeg': b'\xff\xd8',
-        'gif': b'GIF8',
-        'pdf': b'%PDF',
-        'zip': b'PK\x03\x04',
-        'docx': b'PK\x03\x04',
-        'xlsx': b'PK\x03\x04',
-        'pptx': b'PK\x03\x04',
-        'webp': b'RIFF', # WEBP is RIFF...WEBP
-        'bmp': b'BM',
-        'ico': b'\x00\x00\x01\x00'
+        'png': (b'\x89PNG\r\n\x1a\n',),
+        'jpg': (b'\xff\xd8',),
+        'jpeg': (b'\xff\xd8',),
+        'gif': (b'GIF8',),
+        'pdf': (b'%PDF',),
+        'zip': (b'PK\x03\x04',),
+        'docx': (b'PK\x03\x04',),
+        'xlsx': (b'PK\x03\x04',),
+        'bmp': (b'BM',),
+        'ico': (b'\x00\x00\x01\x00',),
+        'tif': (b'II*\x00', b'MM\x00*'),
+        'tiff': (b'II*\x00', b'MM\x00*'),
+        'doc': (b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1',),
+        'xls': (b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1',),
+        'rar': (b'Rar!\x1a\x07\x00', b'Rar!\x1a\x07\x01\x00'),
+        '7z': (b"7z\xbc\xaf'\x1c",),
     }
-    
-    # 바이너리 검증 대상이 아닌 경우 (txt 등)
-    if ext not in signatures:
-        # 텍스트 파일 등은 허용하되, 알려지지 않은 확장자는 주의
+
+    if ext == 'webp':
+        return header[:4] == b'RIFF' and header[8:12] == b'WEBP'
+
+    if ext in ('heic', 'heif'):
+        if len(header) < 12:
+            return False
+        if header[4:8] != b'ftyp':
+            return False
+        major_brand = header[8:12]
+        compatible = header[8:24]
+        return (
+            major_brand in (b'heic', b'heix', b'hevc', b'hevx', b'heif', b'mif1', b'msf1')
+            or b'heic' in compatible
+            or b'heif' in compatible
+            or b'mif1' in compatible
+        )
+
+    if ext == 'txt':
+        return b'\x00' not in text_sample
+
+    if ext == 'svg':
+        if b'\x00' in text_sample:
+            return False
+        lowered = text_sample.decode('utf-8', errors='ignore').lower()
+        return '<svg' in lowered
+
+    sigs = signatures.get(ext)
+    if not sigs:
+        # 방어적으로 허용 확장자만 통과 (확장자별 검증은 지속 확장)
         return ext in ALLOWED_EXTENSIONS
 
-    if ext in signatures:
-        sig = signatures[ext]
-        # Read header
-        start_pos = file.tell()
-        file.seek(0)
-        # [v4.5] WEBP는 12바이트 읽어야 함 (RIFF....WEBP)
-        header = file.read(12 if ext == 'webp' else len(sig))
-        file.seek(start_pos)
-        
-        # [v4.5] WEBP 특수 검증: RIFF....WEBP 형식
-        if ext == 'webp':
-            if not (header[:4] == b'RIFF' and header[8:12] == b'WEBP'):
-                return False
-        elif not header.startswith(sig):
-            return False
-            
-    return True
+    return any(header.startswith(sig) for sig in sigs)

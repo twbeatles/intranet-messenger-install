@@ -270,11 +270,14 @@ def register_routes(app):
         data = _json_dict()
         username = (data.get('username') or '').strip()
         password = data.get('password') or ''
-        remember = bool(data.get('remember', True))
+        raw_remember = data.get('remember', True)
         device_name = (data.get('device_name') or 'Desktop Client').strip()
 
         if not username or not password:
             return jsonify({'error': '아이디와 비밀번호를 입력해주세요.'}), 400
+        if not isinstance(raw_remember, bool):
+            return jsonify({'error': 'remember는 boolean 값이어야 합니다.'}), 400
+        remember = raw_remember
 
         user = authenticate_user(username, password)
         if not user:
@@ -1009,6 +1012,9 @@ def register_routes(app):
                 file_type=file_type,
                 file_size=file_size,
             )
+            if not upload_token:
+                safe_file_delete(file_path)
+                return jsonify({'error': '업로드 토큰 발급에 실패했습니다.'}), 500
             return jsonify({
                 'success': True,
                 'file_path': unique_filename,
@@ -1536,11 +1542,19 @@ def register_routes(app):
         
         data = _json_dict()
         target_user_id = data.get('user_id')
-        is_admin = data.get('is_admin', True)
-        
-        if not target_user_id:
+        if not isinstance(data.get('is_admin', True), bool):
+            return jsonify({'error': 'is_admin은 boolean 값이어야 합니다.'}), 400
+        is_admin = bool(data.get('is_admin', True))
+
+        if target_user_id is None:
             return jsonify({'error': '사용자를 선택해주세요.'}), 400
-        if not is_room_member(room_id, int(target_user_id)):
+        try:
+            target_user_id = int(target_user_id)
+        except (TypeError, ValueError):
+            return jsonify({'error': '유효한 사용자 ID가 필요합니다.'}), 400
+        if target_user_id <= 0:
+            return jsonify({'error': '유효한 사용자 ID가 필요합니다.'}), 400
+        if not is_room_member(room_id, target_user_id):
             return jsonify({'error': '해당 사용자는 대화방 멤버가 아닙니다.'}), 400
         
         # [v4.13] 마지막 관리자 해제 방지

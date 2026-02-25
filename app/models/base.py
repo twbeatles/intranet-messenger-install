@@ -326,6 +326,25 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
+
+        # Upload message token registry (durable, multi-worker safe)
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS upload_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token_hash TEXT NOT NULL UNIQUE,
+                user_id INTEGER NOT NULL,
+                room_id INTEGER NOT NULL,
+                file_path TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                file_type TEXT,
+                file_size INTEGER,
+                issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL,
+                consumed_at TIMESTAMP
+            )
+            '''
+        )
         
         # Auto-migration
         required_columns = {
@@ -389,6 +408,18 @@ def init_db():
             cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_device_sessions_expires_at '
                 'ON device_sessions(expires_at)'
+            )
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_upload_tokens_expires_at '
+                'ON upload_tokens(expires_at)'
+            )
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_upload_tokens_consumed_at '
+                'ON upload_tokens(consumed_at)'
+            )
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_upload_tokens_room_user '
+                'ON upload_tokens(room_id, user_id)'
             )
 
             # Full-text search (FTS5) for plaintext (encrypted=0) text/system messages.
@@ -477,6 +508,16 @@ def init_db():
                 logger.info(f"Cleaned up {cleaned_sessions} stale device sessions")
         except Exception as token_cleanup_error:
             logger.warning(f"Device session cleanup error: {token_cleanup_error}")
+        try:
+            from app.upload_tokens import purge_expired_upload_tokens, cleanup_orphan_upload_files
+            cleaned_tokens = purge_expired_upload_tokens()
+            cleaned_orphans = cleanup_orphan_upload_files()
+            if cleaned_tokens > 0:
+                logger.info(f"Cleaned up {cleaned_tokens} stale upload tokens")
+            if cleaned_orphans > 0:
+                logger.info(f"Cleaned up {cleaned_orphans} orphan upload files")
+        except Exception as upload_cleanup_error:
+            logger.warning(f"Upload cleanup error: {upload_cleanup_error}")
     except Exception as e:
         logger.warning(f"Maintenance tasks error: {e}")
 

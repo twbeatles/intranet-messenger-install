@@ -1,7 +1,7 @@
 # GEMINI.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-02-24
+최종 업데이트: 2026-02-25
 
 ## 1) 이 문서의 역할
 
@@ -11,12 +11,12 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 
 1. `README.md`
 2. `README.en.md`
-3. `TRANSITION_CHECKLIST.md`
-4. `FUNCTIONAL_REVIEW_20260223.md`
+3. `TRANSITION_CHECKLIST.md` (deprecated, 대체: `docs/CUTOVER_ROLLBACK.md`, `docs/OPERATIONS_RUNBOOK.md`)
+4. `FUNCTIONAL_REVIEW_20260223.md` (deprecated, 대체: `IMPLEMENTATION_RISK_AUDIT_20260225.md`)
 5. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
 6. 작업 대상 코드 파일
 
-## 3) 프로젝트 스냅샷 (2026-02-23 기준)
+## 3) 프로젝트 스냅샷 (2026-02-25 기준)
 
 - 제품: 사내 메신저 Desktop-First 전환
 - 서버: `Flask + Socket.IO + SQLite`
@@ -27,8 +27,8 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
   - 카탈로그: `i18n/ko/*`, `i18n/en/*`
   - API 에러 호환: `error` 유지 + `error_code`, `error_localized`, `locale` 추가
 - 테스트 기준:
-  - `pytest tests -q` -> `74 passed`
-  - `pytest --maxfail=1` -> `74 passed`
+  - `pytest tests -q` -> `116 passed`
+  - `pytest --maxfail=1` -> `116 passed`
 - 배포 기준:
   - 서버 EXE: `messenger.spec`
   - 클라이언트 EXE: `messenger_client.spec`
@@ -78,13 +78,13 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 
 ## 6) 현재 우선 점검 대상 (Open Items)
 
-`FUNCTIONAL_REVIEW_20260223.md` 기준:
+`IMPLEMENTATION_RISK_AUDIT_20260225.md` 기준:
 
-1. 자동실행 설정 OFF 유지 이슈
-2. `remember=False` 세션 TTL 정책 일관성
-3. 소켓 실시간 이벤트 UI 동기화 확장
-4. 메시지 수신 시 방 목록 전체 재조회 최적화
-5. 세션 저장 fallback 보안 강화
+1. 업로드 토큰 정리 주기/보관 정책 운영값 확정
+2. orphan 파일 정리 작업의 운영 모니터링 지표 추가
+3. 확장 파일 시그니처 검증의 오탐/누락 관찰 및 정책 보정
+4. `room_updated` 증분 업데이트 고도화(추가 API 호출 축소)
+5. 릴리즈 시 문서 테스트 수치/날짜 동기화 유지
 
 ## 7) 자주 쓰는 명령
 
@@ -102,7 +102,7 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 ## 8) Gemini 시작 프롬프트 템플릿
 
 ```text
-Read `gemini.md`, `README.md`, and `FUNCTIONAL_REVIEW_20260223.md`.
+Read `gemini.md`, `README.md`, and `IMPLEMENTATION_RISK_AUDIT_20260225.md`.
 Before editing, provide:
 1) baseline summary,
 2) non-negotiable contracts in this scope,

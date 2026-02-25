@@ -17,6 +17,23 @@ def _register(client, username: str):
     assert response.status_code == 200
 
 
+def test_device_session_remember_strict_boolean(client):
+    _register(client, 'ttl_strict_bool_user')
+
+    for invalid_remember in ('false', 'true', 0, 1, '0', '1', None):
+        created = client.post(
+            '/api/device-sessions',
+            json={
+                'username': 'ttl_strict_bool_user',
+                'password': 'Password123!',
+                'device_name': 'strict-device',
+                'remember': invalid_remember,
+            },
+        )
+        assert created.status_code == 400
+        assert 'boolean' in str(created.json.get('error') or '').lower()
+
+
 def test_device_session_refresh_preserves_short_ttl_policy(client):
     _register(client, 'ttl_short_user')
 

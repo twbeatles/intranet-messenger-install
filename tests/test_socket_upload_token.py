@@ -52,7 +52,7 @@ def test_socket_file_message_with_upload_token_success(app):
 
     sc = _build_socket_client(app, c)
     try:
-        sc.emit(
+        ack = sc.emit(
             "send_message",
             {
                 "room_id": room_id,
@@ -61,7 +61,10 @@ def test_socket_file_message_with_upload_token_success(app):
                 "upload_token": upload_result["upload_token"],
                 "encrypted": False,
             },
+            callback=True,
         )
+        assert isinstance(ack, dict)
+        assert ack.get("ok") is True
         received = sc.get_received()
         assert any(evt["name"] == "new_message" for evt in received)
     finally:
