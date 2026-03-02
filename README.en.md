@@ -17,7 +17,7 @@ python -m client.main --server-url http://127.0.0.1:5000
 
 ## Key Features
 
-- Desktop client: tray mode, startup option, session restore
+- Desktop client: tray mode, startup option, session restore, dynamic avatars, and enhanced user theme
 - Security: message encryption (v2) + v1 decrypt compatibility (server-trust key relay model)
 - Authentication: `device_sessions` issue/rotate/revoke flow
 - Operations: `GET /api/system/health` and policy-switch driven observability

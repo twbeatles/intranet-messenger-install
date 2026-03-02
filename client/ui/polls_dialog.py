@@ -46,8 +46,8 @@ class PollsDialog(QDialog):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 14, 16, 14)
-        root.setSpacing(10)
+        root.setContentsMargins(20, 18, 20, 18)
+        root.setSpacing(12)
 
         title = QLabel('')
         title.setProperty('title', True)
@@ -55,6 +55,7 @@ class PollsDialog(QDialog):
         subtitle.setProperty('subtitle', True)
         root.addWidget(title)
         root.addWidget(subtitle)
+        root.addSpacing(4)
         self._title_label = title
         self._subtitle_label = subtitle
 
@@ -71,13 +72,14 @@ class PollsDialog(QDialog):
         root.addLayout(toolbar)
 
         body = QHBoxLayout()
-        body.setSpacing(10)
+        body.setSpacing(12)
 
+        # ── Poll List Card ───────────────────────────
         left_card = QFrame()
         left_card.setProperty('card', True)
         left_layout = QVBoxLayout(left_card)
-        left_layout.setContentsMargins(20, 20, 20, 20)
-        left_layout.setSpacing(12)
+        left_layout.setContentsMargins(24, 24, 24, 24)
+        left_layout.setSpacing(16)
         left_title = QLabel('')
         left_title.setProperty('section', True)
         self.poll_list = QListWidget()
@@ -90,13 +92,14 @@ class PollsDialog(QDialog):
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
+        right_layout.setSpacing(12)
 
+        # ── Selected Poll Card ───────────────────────
         options_card = QFrame()
         options_card.setProperty('card', True)
         options_layout = QVBoxLayout(options_card)
-        options_layout.setContentsMargins(20, 20, 20, 20)
-        options_layout.setSpacing(12)
+        options_layout.setContentsMargins(24, 24, 24, 24)
+        options_layout.setSpacing(16)
         options_title = QLabel('')
         options_title.setProperty('section', True)
         self.poll_meta_label = QLabel('')
@@ -111,11 +114,12 @@ class PollsDialog(QDialog):
         options_layout.addWidget(self.vote_btn)
         self._selected_title_label = options_title
 
+        # ── Create Poll Card ─────────────────────────
         create_card = QFrame()
         create_card.setProperty('card', True)
         create_layout = QVBoxLayout(create_card)
-        create_layout.setContentsMargins(20, 20, 20, 20)
-        create_layout.setSpacing(12)
+        create_layout.setContentsMargins(24, 24, 24, 24)
+        create_layout.setSpacing(16)
         create_title = QLabel('')
         create_title.setProperty('section', True)
         self._create_title_label = create_title
@@ -127,6 +131,7 @@ class PollsDialog(QDialog):
         self.options_input.setFixedHeight(126)
 
         flags = QHBoxLayout()
+        flags.setSpacing(12)
         self.multiple_choice_check = QCheckBox('')
         self.anonymous_check = QCheckBox('')
         self.ends_at_check = QCheckBox('')
@@ -176,7 +181,7 @@ class PollsDialog(QDialog):
         self.poll_count_label.setText(t('polls.count', '{count} polls', count=len(polls)))
 
         if not polls:
-            item = QListWidgetItem(t('polls.none', 'No polls in this room.'))
+            item = QListWidgetItem(f"📊 {t('polls.none', 'No polls in this room.')}")
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.poll_list.addItem(item)
             self._update_action_state(has_poll=False, has_option=False)

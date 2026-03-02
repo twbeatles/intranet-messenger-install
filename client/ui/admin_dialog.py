@@ -39,8 +39,8 @@ class AdminDialog(QDialog):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 14, 16, 14)
-        root.setSpacing(10)
+        root.setContentsMargins(20, 18, 20, 18)
+        root.setSpacing(12)
 
         title = QLabel('')
         title.setProperty('title', True)
@@ -48,6 +48,7 @@ class AdminDialog(QDialog):
         subtitle.setProperty('subtitle', True)
         root.addWidget(title)
         root.addWidget(subtitle)
+        root.addSpacing(4)
         self._title_label = title
         self._subtitle_label = subtitle
 
@@ -69,8 +70,8 @@ class AdminDialog(QDialog):
         list_card = QFrame()
         list_card.setProperty('card', True)
         list_layout = QVBoxLayout(list_card)
-        list_layout.setContentsMargins(20, 20, 20, 20)
-        list_layout.setSpacing(12)
+        list_layout.setContentsMargins(24, 24, 24, 24)
+        list_layout.setSpacing(16)
         self.member_list = QListWidget()
         self.member_list.setSpacing(8)
         list_layout.addWidget(self.member_list)
@@ -93,7 +94,7 @@ class AdminDialog(QDialog):
         self.summary_label.setText(t('admin.count', '{count} members', count=len(members)))
 
         if not members:
-            item = QListWidgetItem(t('admin.none', 'No members found.'))
+            item = QListWidgetItem(f"📭 {t('admin.none', 'No members found.')}")
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.member_list.addItem(item)
             self.selection_label.setText(t('admin.none_detail', 'No member data available.'))

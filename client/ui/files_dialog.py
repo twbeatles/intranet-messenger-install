@@ -42,8 +42,8 @@ class FilesDialog(QDialog):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 14, 16, 14)
-        root.setSpacing(10)
+        root.setContentsMargins(20, 18, 20, 18)
+        root.setSpacing(12)
 
         title = QLabel('')
         title.setProperty('title', True)
@@ -51,6 +51,7 @@ class FilesDialog(QDialog):
         subtitle.setProperty('subtitle', True)
         root.addWidget(title)
         root.addWidget(subtitle)
+        root.addSpacing(4)
         self._title_label = title
         self._subtitle_label = subtitle
 
@@ -74,8 +75,8 @@ class FilesDialog(QDialog):
         list_card = QFrame()
         list_card.setProperty('card', True)
         list_layout = QVBoxLayout(list_card)
-        list_layout.setContentsMargins(20, 20, 20, 20)
-        list_layout.setSpacing(12)
+        list_layout.setContentsMargins(24, 24, 24, 24)
+        list_layout.setSpacing(16)
         self.file_list = QListWidget()
         self.file_list.setSpacing(8)
         list_layout.addWidget(self.file_list)
@@ -99,7 +100,7 @@ class FilesDialog(QDialog):
         self.summary_label.setText(t('files.count', '{count} files', count=len(files)))
 
         if not files:
-            item = QListWidgetItem(t('files.none', 'No files in this room.'))
+            item = QListWidgetItem(f"📁 {t('files.none', 'No files in this room.')}")
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.file_list.addItem(item)
             self.selection_label.setText(t('files.upload_hint', 'Upload a file to get started.'))

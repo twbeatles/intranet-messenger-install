@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from client.i18n import i18n_manager, t
+from client.ui.theme import avatar_color, avatar_text_color
 
 
 class _ComposerTextEdit(QTextEdit):
@@ -102,6 +103,7 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
+        # ── Left Panel (sidebar) ────────────────────────────
         left_panel = QFrame()
         left_panel.setProperty('sidebar', True)
         left_panel.setMinimumWidth(320)
@@ -115,16 +117,16 @@ class MainWindow(QMainWindow):
         self.user_label = QLabel('')
         self.user_label.setProperty('section', True)
         self.connection_label = QLabel('')
-        self._set_connection_style(connected=False)
+        self.connection_label.setProperty('status', 'disconnected')
         user_info.addWidget(self.user_label)
         user_info.addSpacing(2)
         user_info.addWidget(self.connection_label)
-        
+
         self.settings_btn = QPushButton('⚙️')
+        self.settings_btn.setProperty('variant', 'icon')
         self.settings_btn.setFixedSize(36, 36)
-        self.settings_btn.setStyleSheet("border-radius: 18px; border: none; background: #e2e8f0; font-size: 14pt;")
         self.profile_btn = QPushButton('')
-        
+
         user_header.addLayout(user_info)
         user_header.addStretch()
         user_header.addWidget(self.profile_btn)
@@ -139,7 +141,7 @@ class MainWindow(QMainWindow):
         self.rooms_list.setSpacing(6)
         self.rooms_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.rooms_list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        
+
         left_layout.addLayout(user_header)
         left_layout.addSpacing(4)
         left_layout.addWidget(self.search_input)
@@ -160,6 +162,7 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(left_panel)
 
+        # ── Right Panel (chat area) ─────────────────────────
         right_panel = QFrame()
         right_panel.setProperty('chatArea', True)
         right_layout = QVBoxLayout(right_panel)
@@ -168,23 +171,27 @@ class MainWindow(QMainWindow):
 
         # Room Header
         room_header = QFrame()
-        room_header.setStyleSheet("background: #ffffff; border-bottom: 1px solid #e2e8f0; border-top-right-radius: 12px;")
+        room_header.setStyleSheet(
+            "background: #ffffff; border-bottom: 1px solid #e2e8f0; border-top-right-radius: 12px;"
+        )
         room_header_layout = QHBoxLayout(room_header)
         room_header_layout.setContentsMargins(28, 22, 28, 22)
-        
+
         self.room_title = QLabel('')
         self.room_title.setProperty('section', True)
         self.room_title.setStyleSheet("font-size: 16pt;")
         self.room_meta = QLabel('')
         self.room_meta.setProperty('muted', True)
 
-        self.polls_btn = QPushButton('')
-        self.files_btn = QPushButton('')
-        self.admin_btn = QPushButton('')
+        # Room action buttons — 두 그룹으로 분리
         self.invite_btn = QPushButton('')
         self.rename_btn = QPushButton('')
         self.leave_btn = QPushButton('')
         self.leave_btn.setProperty('variant', 'danger')
+
+        self.polls_btn = QPushButton('')
+        self.files_btn = QPushButton('')
+        self.admin_btn = QPushButton('')
         self.polls_btn.setProperty('variant', 'primary')
 
         header_titles = QVBoxLayout()
@@ -193,31 +200,55 @@ class MainWindow(QMainWindow):
         header_titles.addWidget(self.room_meta)
         room_header_layout.addLayout(header_titles)
         room_header_layout.addStretch()
-        room_header_layout.addWidget(self.invite_btn)
-        room_header_layout.addWidget(self.rename_btn)
-        room_header_layout.addWidget(self.leave_btn)
-        room_header_layout.addWidget(self.polls_btn)
-        room_header_layout.addWidget(self.files_btn)
-        room_header_layout.addWidget(self.admin_btn)
 
+        # Feature actions group (Polls | Files | Admin)
+        feature_group = QHBoxLayout()
+        feature_group.setSpacing(4)
+        feature_group.addWidget(self.polls_btn)
+        feature_group.addWidget(self.files_btn)
+        feature_group.addWidget(self.admin_btn)
+        room_header_layout.addLayout(feature_group)
+
+        # Separator between groups
+        header_sep = QFrame()
+        header_sep.setFrameShape(QFrame.Shape.VLine)
+        header_sep.setStyleSheet("color: #e2e8f0; max-width: 1px; margin: 4px 6px;")
+        room_header_layout.addWidget(header_sep)
+
+        # Room management group (Invite | Rename | Leave)
+        manage_group = QHBoxLayout()
+        manage_group.setSpacing(4)
+        manage_group.addWidget(self.invite_btn)
+        manage_group.addWidget(self.rename_btn)
+        manage_group.addWidget(self.leave_btn)
+        room_header_layout.addLayout(manage_group)
+
+        # Messages list
         self.messages_list = QListWidget()
         self.messages_list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.messages_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.messages_list.setSpacing(18)  # 메시지 간 여유
-        self.messages_list.setStyleSheet("background: #f8fafc; padding: 24px 32px; border: none;")
+        self.messages_list.setSpacing(18)
+        self.messages_list.setStyleSheet(
+            "background: #f8fafc; padding: 24px 32px; border: none;"
+        )
         self.messages_list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.messages_list.verticalScrollBar().valueChanged.connect(self._on_messages_scrolled)
 
+        # Compose box
         compose_box = QFrame()
-        compose_box.setStyleSheet("background: #ffffff; border-top: 1px solid #e2e8f0; border-bottom-right-radius: 12px;")
+        compose_box.setStyleSheet(
+            "background: #ffffff; border-top: 1px solid #e2e8f0; border-bottom-right-radius: 12px;"
+        )
         compose_box_layout = QVBoxLayout(compose_box)
         compose_box_layout.setContentsMargins(24, 20, 24, 20)
         compose_box_layout.setSpacing(12)
 
         self.message_input = _ComposerTextEdit()
         self.message_input.setFixedHeight(94)
-        self.message_input.setStyleSheet("border: none; background: transparent; font-size: 11pt;")
-        
+        self.message_input.setStyleSheet(
+            "border: none; background: transparent; font-size: 11pt;"
+        )
+
         compose_meta = QHBoxLayout()
         self.compose_hint_label = QLabel('')
         self.compose_hint_label.setProperty('muted', True)
@@ -237,7 +268,7 @@ class MainWindow(QMainWindow):
         self.send_btn.setMinimumWidth(80)
         compose_meta.addWidget(self.attach_btn)
         compose_meta.addWidget(self.send_btn)
-        
+
         compose_box_layout.addWidget(self.message_input)
         compose_box_layout.addLayout(compose_meta)
 
@@ -249,6 +280,7 @@ class MainWindow(QMainWindow):
         splitter.setSizes([330, 930])
         layout.addWidget(splitter)
 
+        # Signal connections
         self.profile_btn.clicked.connect(self.edit_profile_requested.emit)
         self.refresh_btn.clicked.connect(self.refresh_rooms_requested.emit)
         self.new_room_btn.clicked.connect(self.create_room_requested.emit)
@@ -268,6 +300,8 @@ class MainWindow(QMainWindow):
         self.message_input.send_shortcut_triggered.connect(self._emit_send_message)
         self.message_input.textChanged.connect(self._on_message_text_changed)
         self._set_room_actions_enabled(False)
+
+    # ── Public API ──────────────────────────────────────────
 
     def set_user(self, user: dict[str, Any]) -> None:
         nickname = user.get('nickname') or user.get('username') or t('common.unknown', 'Unknown')
@@ -429,6 +463,8 @@ class MainWindow(QMainWindow):
     def show_info(self, message: str) -> None:
         QMessageBox.information(self, t('common.info', 'Info'), message)
 
+    # ── Private slots ───────────────────────────────────────
+
     def _emit_send_message(self) -> None:
         text = self.message_input.toPlainText().strip()
         if not text:
@@ -449,7 +485,9 @@ class MainWindow(QMainWindow):
             self.delivery_state_label.setText(
                 t('main.delivery_pending', 'Sending... ({count})', count=self._delivery_count)
             )
-            self.delivery_state_label.setStyleSheet('color:#7c2d12; background:#ffedd5; border-radius:8px; padding:2px 8px;')
+            self.delivery_state_label.setProperty('delivery', 'pending')
+            self.delivery_state_label.style().unpolish(self.delivery_state_label)
+            self.delivery_state_label.style().polish(self.delivery_state_label)
             self.retry_send_btn.setVisible(False)
             return
 
@@ -457,12 +495,16 @@ class MainWindow(QMainWindow):
             self.delivery_state_label.setText(
                 t('main.delivery_failed', 'Failed to send ({count})', count=self._delivery_count)
             )
-            self.delivery_state_label.setStyleSheet('color:#7f1d1d; background:#fee2e2; border-radius:8px; padding:2px 8px;')
+            self.delivery_state_label.setProperty('delivery', 'failed')
+            self.delivery_state_label.style().unpolish(self.delivery_state_label)
+            self.delivery_state_label.style().polish(self.delivery_state_label)
             self.retry_send_btn.setVisible(True)
             return
 
         self.delivery_state_label.setText('')
-        self.delivery_state_label.setStyleSheet('')
+        self.delivery_state_label.setProperty('delivery', '')
+        self.delivery_state_label.style().unpolish(self.delivery_state_label)
+        self.delivery_state_label.style().polish(self.delivery_state_label)
         self.retry_send_btn.setVisible(False)
 
     def _select_file(self) -> None:
@@ -491,14 +533,12 @@ class MainWindow(QMainWindow):
         self._connected = connected
         if connected:
             self.connection_label.setText(t('common.connected', 'Connected'))
-            self.connection_label.setStyleSheet(
-                'color: #065f46; background: #d1fae5; border-radius: 9px; padding: 3px 10px;'
-            )
-            return
-        self.connection_label.setText(t('common.disconnected', 'Disconnected'))
-        self.connection_label.setStyleSheet(
-            'color: #7f1d1d; background: #fee2e2; border-radius: 9px; padding: 3px 10px;'
-        )
+            self.connection_label.setProperty('status', 'connected')
+        else:
+            self.connection_label.setText(t('common.disconnected', 'Disconnected'))
+            self.connection_label.setProperty('status', 'disconnected')
+        self.connection_label.style().unpolish(self.connection_label)
+        self.connection_label.style().polish(self.connection_label)
 
     def _set_room_actions_enabled(self, enabled: bool) -> None:
         self.polls_btn.setEnabled(enabled)
@@ -525,6 +565,8 @@ class MainWindow(QMainWindow):
                 count=char_count,
             )
         )
+
+    # ── Message rendering ───────────────────────────────────
 
     def _append_message_item(self, message: dict[str, Any]) -> None:
         self._insert_message_item(message, at_top=False)
@@ -585,7 +627,7 @@ class MainWindow(QMainWindow):
 
         if not is_own:
             sender_label = QLabel(sender)
-            sender_label.setStyleSheet("color: #3b82f6; font-weight: 700; font-size: 9.5pt;")
+            sender_label.setProperty('msgSender', True)
             bubble_layout.addWidget(sender_label)
 
         if reply_content:
@@ -598,19 +640,20 @@ class MainWindow(QMainWindow):
                     preview=preview,
                 )
             )
-            reply.setStyleSheet("color: #64748b; font-size: 9pt; border-left: 2.5px solid #cbd5e1; padding-left: 8px;")
+            reply.setProperty('msgReply', True)
             reply.setWordWrap(True)
             bubble_layout.addWidget(reply)
 
         body = QLabel(content)
         body.setWordWrap(True)
-        body.setStyleSheet("font-size: 10.5pt; line-height: 1.5;")
+        if self._contains_mention(content):
+            body.setProperty('msgBody', 'mention')
+        else:
+            body.setProperty('msgBody', True)
         body.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByKeyboard
             | Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        if self._contains_mention(content):
-            body.setStyleSheet('background: rgba(250, 204, 21, 0.25); border-radius: 6px; padding: 4px 6px; font-size: 10.5pt;')
         bubble_layout.addWidget(body)
 
         reaction_text = self._format_reactions(reactions)
@@ -620,8 +663,7 @@ class MainWindow(QMainWindow):
             bubble_layout.addWidget(reaction_label)
 
         time_label = QLabel(timestamp)
-        time_label.setProperty('muted', True)
-        time_label.setStyleSheet("font-size: 8pt; margin-bottom: 2px;")
+        time_label.setProperty('msgTime', True)
         time_layout = QVBoxLayout()
         time_layout.addStretch()
         time_layout.addWidget(time_label)
@@ -631,10 +673,17 @@ class MainWindow(QMainWindow):
             container_layout.addLayout(time_layout)
             container_layout.addWidget(bubble)
         else:
+            # 아바타에 동적 색상 적용
+            avatar_key = str(message.get('sender_id') or sender)
+            bg = avatar_color(avatar_key)
+            fg = avatar_text_color(bg)
             avatar_label = QLabel(sender[0].upper() if sender else "?")
             avatar_label.setFixedSize(40, 40)
             avatar_label.setAlignment(Qt.AlignCenter)
-            avatar_label.setStyleSheet("background-color: #cbd5e1; color: #ffffff; border-radius: 20px; font-weight: bold; font-size: 14pt;")
+            avatar_label.setStyleSheet(
+                f"background-color: {bg}; color: {fg}; border-radius: 20px;"
+                " font-weight: bold; font-size: 14pt;"
+            )
 
             avatar_layout = QVBoxLayout()
             avatar_layout.addWidget(avatar_label)
@@ -646,6 +695,8 @@ class MainWindow(QMainWindow):
             container_layout.addStretch()
 
         return container
+
+    # ── Message index management ────────────────────────────
 
     def _find_message_row(self, message_id: int) -> int:
         if message_id <= 0:
@@ -742,6 +793,8 @@ class MainWindow(QMainWindow):
         updated['message_type'] = 'text'
         return self._replace_message_item(row, updated)
 
+    # ── History banner ──────────────────────────────────────
+
     def _on_messages_scrolled(self, value: int) -> None:
         if self._history_scroll_blocked or value > 2 or not self._history_has_more or self._history_loading:
             return
@@ -801,6 +854,8 @@ class MainWindow(QMainWindow):
 
         banner.setText(t('main.history_reached_start', 'Reached the beginning of the conversation'))
 
+    # ── Typing indicator ────────────────────────────────────
+
     def set_typing_user(self, user_id: int, nickname: str, is_typing: bool) -> None:
         sender = (nickname or '').strip()
         if int(user_id or 0) == int(self._current_user_id):
@@ -814,7 +869,7 @@ class MainWindow(QMainWindow):
             self.room_meta.setText(
                 t(
                     'main.typing_meta',
-                    '{meta} | {user} is typing...',
+                    '{meta} | ✏️ {user} is typing...',
                     meta=meta,
                     user=self._typing_user,
                 )
@@ -845,20 +900,30 @@ class MainWindow(QMainWindow):
             chunks.append(f"{emoji} {count}" if count > 0 else emoji)
         return '   '.join(chunks)
 
+    # ── Room list item widget ───────────────────────────────
+
     def _build_room_item_widget(self, room: dict[str, Any]) -> QWidget:
         name = str(room.get('name') or t('main.room_default_name', 'Room {room_id}', room_id=room.get('id')))
         preview = str(room.get('last_message_preview') or t('main.no_recent_message', 'No recent message.'))
         unread = int(room.get('unread_count') or 0)
+        last_time = str(room.get('last_message_time') or '')
 
         wrapper = QWidget()
         wrapper_layout = QHBoxLayout(wrapper)
         wrapper_layout.setContentsMargins(12, 12, 12, 12)
         wrapper_layout.setSpacing(14)
 
+        # 동적 아바타 색상
+        avatar_key = str(room.get('id') or name)
+        bg = avatar_color(avatar_key)
+        fg = avatar_text_color(bg)
         avatar_label = QLabel(name[0].upper() if name else "?")
         avatar_label.setFixedSize(44, 44)
         avatar_label.setAlignment(Qt.AlignCenter)
-        avatar_label.setStyleSheet("background-color: #e2e8f0; color: #475569; border-radius: 22px; font-weight: bold; font-size: 14pt;")
+        avatar_label.setStyleSheet(
+            f"background-color: {bg}; color: {fg}; border-radius: 22px;"
+            " font-weight: bold; font-size: 14pt;"
+        )
 
         content_layout = QVBoxLayout()
         content_layout.setSpacing(2)
@@ -868,6 +933,12 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 11pt; font-weight: 600; color: #1e293b;")
         top.addWidget(title)
         top.addStretch()
+
+        if last_time:
+            time_label = QLabel(last_time)
+            time_label.setProperty('muted', True)
+            time_label.setStyleSheet("font-size: 8.5pt; color: #94a3b8;")
+            top.addWidget(time_label)
 
         if unread > 0:
             badge = QLabel(str(unread))
@@ -885,6 +956,8 @@ class MainWindow(QMainWindow):
         wrapper_layout.addWidget(avatar_label)
         wrapper_layout.addLayout(content_layout)
         return wrapper
+
+    # ── i18n retranslation ──────────────────────────────────
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(t('app.desktop_title', 'Intranet Messenger Desktop'))

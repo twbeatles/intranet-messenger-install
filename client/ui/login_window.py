@@ -6,6 +6,7 @@ Login window for desktop messenger.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -30,6 +31,7 @@ class LoginWindow(QDialog):
         super().__init__(parent)
         self.setMinimumSize(520, 520)
         self.setObjectName("AppRoot")
+        self._password_visible = False
         self._build_ui()
         i18n_manager.subscribe(self.retranslate_ui)
         self.retranslate_ui()
@@ -39,25 +41,25 @@ class LoginWindow(QDialog):
         root.setContentsMargins(40, 36, 40, 36)
         root.setSpacing(20)
 
-        # 타이틀부 여유
+        # 타이틀부
         title_box = QVBoxLayout()
         title_box.setSpacing(6)
         title_box.setAlignment(Qt.AlignCenter)
-        
+
         title = QLabel('')
         title.setProperty('title', True)
         title.setAlignment(Qt.AlignCenter)
-        
+
         subtitle = QLabel('')
         subtitle.setProperty('subtitle', True)
         subtitle.setAlignment(Qt.AlignCenter)
-        
+
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
-        
+
         root.addLayout(title_box)
         root.addSpacing(10)
-        
+
         self._title_label = title
         self._subtitle_label = subtitle
 
@@ -75,7 +77,7 @@ class LoginWindow(QDialog):
         card_layout.addSpacing(4)
         self._section_label = section
 
-        # Form - 필드 여백(간격) 최적화로 모던하게 띄움
+        # Form
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         form.setFormAlignment(Qt.AlignTop)
@@ -93,6 +95,13 @@ class LoginWindow(QDialog):
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_label = QLabel('')
+
+        # 비밀번호 표시/숨기기 토글 액션
+        self._toggle_pw_action = self.password_input.addAction(
+            QAction("👁", self.password_input),
+            QLineEdit.ActionPosition.TrailingPosition,
+        )
+        self._toggle_pw_action.triggered.connect(self._toggle_password_visibility)
         form.addRow(self.password_label, self.password_input)
 
         self.nickname_input = QLineEdit()
@@ -103,7 +112,7 @@ class LoginWindow(QDialog):
         self.device_name_label = QLabel('')
         form.addRow(self.device_name_label, self.device_name_input)
 
-        # remember_check row 에 약간의 padding 추가용 vlayout 처리
+        # Remember checkbox
         rem_layout = QVBoxLayout()
         rem_layout.setContentsMargins(0, 4, 0, 8)
         self.remember_check = QCheckBox('')
@@ -117,11 +126,11 @@ class LoginWindow(QDialog):
         btn_row = QHBoxLayout()
         self.register_btn = QPushButton('')
         self.register_btn.setMinimumHeight(44)
-        
+
         self.login_btn = QPushButton('')
         self.login_btn.setProperty('variant', 'primary')
         self.login_btn.setMinimumHeight(44)
-        
+
         btn_row.addWidget(self.register_btn)
         btn_row.addWidget(self.login_btn)
         card_layout.addLayout(btn_row)
@@ -134,10 +143,12 @@ class LoginWindow(QDialog):
         card_layout.addWidget(help_text)
         self._help_label = help_text
 
+        # Status label — 에러/진행 상태 시각화
         self.status_label = QLabel('')
         self.status_label.setProperty('muted', True)
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setMinimumHeight(24)
+        self.status_label.setWordWrap(True)
         root.addWidget(self.status_label)
         root.addStretch()
 
@@ -145,6 +156,15 @@ class LoginWindow(QDialog):
         self.register_btn.clicked.connect(self._on_register_clicked)
         self.password_input.returnPressed.connect(self._on_login_clicked)
         self.username_input.returnPressed.connect(self.password_input.setFocus)
+
+    def _toggle_password_visibility(self) -> None:
+        self._password_visible = not self._password_visible
+        if self._password_visible:
+            self.password_input.setEchoMode(QLineEdit.Normal)
+            self._toggle_pw_action.setText("🔒")
+        else:
+            self.password_input.setEchoMode(QLineEdit.Password)
+            self._toggle_pw_action.setText("👁")
 
     def set_server_url(self, server_url: str) -> None:
         self.server_url_input.setText(server_url)
@@ -158,7 +178,16 @@ class LoginWindow(QDialog):
         self.remember_check.setEnabled(not busy)
         self.login_btn.setEnabled(not busy)
         self.register_btn.setEnabled(not busy)
-        self.status_label.setText(t('login.signing_in', 'Signing in...') if busy else '')
+        if busy:
+            self.login_btn.setText(t('login.signing_in', 'Signing in...'))
+            self.status_label.setText(t('login.signing_in', 'Signing in...'))
+            self.status_label.setProperty('status', 'warning')
+        else:
+            self.login_btn.setText(t('common.login', 'Login'))
+            self.status_label.setText('')
+            self.status_label.setProperty('status', '')
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
         self.setCursor(Qt.WaitCursor if busy else Qt.ArrowCursor)
 
     def _read_common(self) -> tuple[str, str, str]:
@@ -171,8 +200,7 @@ class LoginWindow(QDialog):
         server_url, username, password = self._read_common()
         device_name = self.device_name_input.text().strip() or 'Windows Desktop'
         if not server_url or not username or not password:
-            self.show_error(t('login.required_fields', 'Server URL, username and password are required.'))
-            self.status_label.setText(t('login.required_fields', 'Server URL, username and password are required.'))
+            self._show_status_error(t('login.required_fields', 'Server URL, username and password are required.'))
             return
         self.login_requested.emit(
             server_url,
@@ -186,17 +214,26 @@ class LoginWindow(QDialog):
         server_url, username, password = self._read_common()
         nickname = self.nickname_input.text().strip() or username
         if not server_url or not username or not password:
-            self.show_error(t('login.required_fields', 'Server URL, username and password are required.'))
-            self.status_label.setText(t('login.required_fields', 'Server URL, username and password are required.'))
+            self._show_status_error(t('login.required_fields', 'Server URL, username and password are required.'))
             return
         self.register_requested.emit(server_url, username, password, nickname)
 
+    def _show_status_error(self, message: str) -> None:
+        """Status label에 에러 시각화."""
+        self.status_label.setText(f"⚠️ {message}")
+        self.status_label.setProperty('status', 'disconnected')
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
+
     def show_error(self, message: str) -> None:
-        self.status_label.setText(message)
+        self._show_status_error(message)
         QMessageBox.critical(self, t('common.error', 'Error'), message)
 
     def show_info(self, message: str) -> None:
         self.status_label.setText(message)
+        self.status_label.setProperty('status', '')
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
         QMessageBox.information(self, t('common.info', 'Info'), message)
 
     def retranslate_ui(self) -> None:
@@ -220,7 +257,10 @@ class LoginWindow(QDialog):
         self.device_name_input.setPlaceholderText(t('login.device_name', 'Device'))
 
         self.remember_check.setText(t('login.remember', 'Remember this device'))
-        self.login_btn.setText(t('common.login', 'Login'))
+        if not self.login_btn.isEnabled():
+            pass  # busy 상태일 때는 버튼 텍스트 유지
+        else:
+            self.login_btn.setText(t('common.login', 'Login'))
         self.register_btn.setText(t('common.register', 'Register'))
         self._help_label.setText(
             t(

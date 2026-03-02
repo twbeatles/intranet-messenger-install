@@ -28,7 +28,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(520, 360)
+        self.setMinimumSize(520, 400)
         self.setObjectName("AppRoot")
 
         root = QVBoxLayout(self)
@@ -41,44 +41,73 @@ class SettingsDialog(QDialog):
         subtitle.setProperty('subtitle', True)
         root.addWidget(title)
         root.addWidget(subtitle)
+        root.addSpacing(4)
         self._title_label = title
         self._subtitle_label = subtitle
 
-        card = QFrame()
-        card.setProperty('card', True)
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(24, 24, 24, 24)
-        card_layout.setSpacing(16)
+        # ── Server Settings Card ─────────────────────
+        server_card = QFrame()
+        server_card.setProperty('card', True)
+        server_layout = QVBoxLayout(server_card)
+        server_layout.setContentsMargins(24, 24, 24, 24)
+        server_layout.setSpacing(16)
 
-        form = QFormLayout()
-        form.setHorizontalSpacing(24)
-        form.setVerticalSpacing(16)
+        server_section = QLabel('')
+        server_section.setProperty('section', True)
+        server_layout.addWidget(server_section)
+        self._server_section_label = server_section
+
+        server_form = QFormLayout()
+        server_form.setHorizontalSpacing(24)
+        server_form.setVerticalSpacing(16)
 
         self.server_url_input = QLineEdit()
+        self.server_url_label = QLabel('')
+        server_form.addRow(self.server_url_label, self.server_url_input)
+
+        self.channel_combo = QComboBox()
+        self.channel_combo.addItems(['stable', 'canary'])
+        self.channel_label = QLabel('')
+        server_form.addRow(self.channel_label, self.channel_combo)
+
+        server_layout.addLayout(server_form)
+        root.addWidget(server_card)
+
+        # ── Preferences Card ─────────────────────────
+        prefs_card = QFrame()
+        prefs_card.setProperty('card', True)
+        prefs_layout = QVBoxLayout(prefs_card)
+        prefs_layout.setContentsMargins(24, 24, 24, 24)
+        prefs_layout.setSpacing(16)
+
+        prefs_section = QLabel('')
+        prefs_section.setProperty('section', True)
+        prefs_layout.addWidget(prefs_section)
+        self._prefs_section_label = prefs_section
+
+        prefs_form = QFormLayout()
+        prefs_form.setHorizontalSpacing(24)
+        prefs_form.setVerticalSpacing(16)
+
+        self.language_combo = QComboBox()
+        self.language_combo.addItems(['auto', 'ko', 'en'])
+        self.language_label = QLabel('')
+        prefs_form.addRow(self.language_label, self.language_combo)
+
         self.auto_startup_check = QCheckBox('')
         self.tray_check = QCheckBox('')
         self.tray_check.setChecked(True)
-        self.language_combo = QComboBox()
-        self.language_combo.addItems(['auto', 'ko', 'en'])
-        self.channel_combo = QComboBox()
-        self.channel_combo.addItems(['stable', 'canary'])
+        prefs_form.addRow('', self.auto_startup_check)
+        prefs_form.addRow('', self.tray_check)
 
-        self.server_url_label = QLabel('')
-        self.language_label = QLabel('')
-        self.channel_label = QLabel('')
-
-        form.addRow(self.server_url_label, self.server_url_input)
-        form.addRow(self.language_label, self.language_combo)
-        form.addRow(self.channel_label, self.channel_combo)
-        form.addRow('', self.auto_startup_check)
-        form.addRow('', self.tray_check)
-        card_layout.addLayout(form)
-        root.addWidget(card)
+        prefs_layout.addLayout(prefs_form)
+        root.addWidget(prefs_card)
 
         self.status_label = QLabel('')
         self.status_label.setProperty('muted', True)
         root.addWidget(self.status_label)
 
+        # ── Buttons ──────────────────────────────────
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.check_update_btn = QPushButton('')
@@ -143,6 +172,8 @@ class SettingsDialog(QDialog):
                 'Manage startup behavior, tray behavior, server URL and language.',
             )
         )
+        self._server_section_label.setText(t('settings.section.server', 'Server'))
+        self._prefs_section_label.setText(t('settings.section.preferences', 'Preferences'))
         self.server_url_label.setText(t('settings.server_url', 'Server URL'))
         self.language_label.setText(t('settings.language_label', 'Display Language'))
         self.channel_label.setText(t('settings.update_channel_label', 'Update Channel'))
