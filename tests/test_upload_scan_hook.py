@@ -19,6 +19,10 @@ def _create_room(client) -> int:
     return int(created.json['room_id'])
 
 
+def _png_bytes() -> bytes:
+    return b'\x89PNG\r\n\x1a\n' + b'\x00' * 48
+
+
 def test_upload_scan_unknown_provider_blocks(client):
     _register_and_login(client, 'scan_block')
     room_id = _create_room(client)
@@ -46,3 +50,16 @@ def test_upload_scan_noop_allows(client):
     )
     assert response.status_code == 200
     assert response.json.get('upload_token')
+
+
+def test_profile_upload_scan_unknown_provider_blocks(client):
+    _register_and_login(client, 'scan_profile_block')
+    client.application.config['UPLOAD_SCAN_ENABLED'] = True
+    client.application.config['UPLOAD_SCAN_PROVIDER'] = 'unknown'
+
+    response = client.post(
+        '/api/profile/image',
+        data={'file': (io.BytesIO(_png_bytes()), 'avatar.png')},
+        content_type='multipart/form-data',
+    )
+    assert response.status_code == 400

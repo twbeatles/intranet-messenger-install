@@ -250,6 +250,7 @@ def init_db():
                 nickname TEXT,
                 profile_image TEXT,
                 status TEXT DEFAULT 'offline',
+                is_platform_admin INTEGER DEFAULT 0,
                 public_key TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -478,6 +479,9 @@ def init_db():
         
         # Auto-migration
         required_columns = {
+            'users': {
+                'is_platform_admin': 'INTEGER DEFAULT 0',
+            },
             'room_members': {
                 'role': 'TEXT DEFAULT "member"',
                 'pinned': 'INTEGER DEFAULT 0',
@@ -508,6 +512,24 @@ def init_db():
                         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
         except Exception as e:
             logger.error(f"Migration failed: {e}")
+
+        # Bootstrap: ensure there is at least one platform admin.
+        try:
+            cursor.execute(
+                "SELECT COUNT(*) AS count FROM users WHERE COALESCE(is_platform_admin, 0) = 1"
+            )
+            platform_admin_count = int(cursor.fetchone()[0] or 0)
+            if platform_admin_count == 0:
+                cursor.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1")
+                first_user = cursor.fetchone()
+                if first_user:
+                    cursor.execute(
+                        "UPDATE users SET is_platform_admin = 1 WHERE id = ?",
+                        (int(first_user['id']),),
+                    )
+                    logger.info(f"Platform admin bootstrapped: user_id={int(first_user['id'])}")
+        except Exception as e:
+            logger.warning(f"Platform admin bootstrap check failed: {e}")
         
         # 인덱스 생성
         try:
@@ -530,6 +552,9 @@ def init_db():
                 '''
             )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)")
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_users_platform_admin ON users(is_platform_admin)'
+            )
             cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_device_sessions_user_revoked '
                 'ON device_sessions(user_id, revoked_at)'

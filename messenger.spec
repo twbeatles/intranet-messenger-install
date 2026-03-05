@@ -74,6 +74,7 @@ a = Analysis(
     datas=[
         ("static", "static"),
         ("templates", "templates"),
+        ("i18n", "i18n"),
         ("certs", "certs"),
     ],
     hiddenimports=hiddenimports,

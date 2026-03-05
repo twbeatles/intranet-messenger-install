@@ -72,7 +72,7 @@ WiX 정의 파일:
 1. 서버 먼저 배포
 - `MessengerServer.msi` 설치
 - 서버 기동 확인
-- `GET /api/client/update` 응답 확인
+- `GET /api/client/update` 응답 확인 (`signature_required`, `artifact_sha256`, `artifact_signature` 필드 점검)
 
 2. 클라이언트 배포
 - `MessengerClient.msi` 전사 배포 (수동/배포도구)
@@ -100,6 +100,9 @@ WiX 정의 파일:
   -CanaryLatestVersion "1.1.0" `
   -CanaryDownloadUrl "<canary URL>"
 ```
+
+운영(prod)에서는 `REQUIRE_SIGNED_UPDATES_IN_PROD=True` 상태를 유지하고,
+`/api/client/update`에 서명 메타데이터가 내려오는지 반드시 확인합니다.
 
 ## 6) 배포 전 검증 체크
 

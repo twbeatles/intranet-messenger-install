@@ -102,3 +102,19 @@ def test_cleanup_orphan_profile_files_keeps_tracked_profile_image(app):
     assert removed >= 1
     assert tracked_abs.exists()
     assert not orphan_abs.exists()
+
+
+def test_profile_image_upload_blocks_on_unknown_scan_provider(app):
+    client = app.test_client()
+    _register(client, 'pfscanblk')
+    _login(client, 'pfscanblk')
+
+    client.application.config['UPLOAD_SCAN_ENABLED'] = True
+    client.application.config['UPLOAD_SCAN_PROVIDER'] = 'unknown'
+
+    response = client.post(
+        '/api/profile/image',
+        data={'file': (io.BytesIO(_png_bytes()), 'blocked_profile.png')},
+        content_type='multipart/form-data',
+    )
+    assert response.status_code == 400

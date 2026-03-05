@@ -227,7 +227,6 @@ function setupEventListeners() {
             $('userName').textContent = nickname;
             UI.showToast('프로필 저장됨', 'success');
             UI.closeModal('profileModal');
-            state.socket.emit('profile_updated', { nickname });
         }
     };
 }

@@ -137,7 +137,10 @@ class MessengerAppController(QObject):
         sha = str(payload.get('artifact_sha256') or '').strip()
         sig = str(payload.get('artifact_signature') or '').strip()
         alg = str(payload.get('signature_alg') or '').strip()
+        signature_required = bool(payload.get('signature_required', False))
         if not sha and not sig:
+            if signature_required:
+                return False, 'signed update metadata is required'
             return True, ''
         if not sha:
             return False, 'artifact_sha256 is missing'
@@ -146,6 +149,15 @@ class MessengerAppController(QObject):
         if not alg:
             return False, 'signature_alg is missing'
         return True, ''
+
+    @staticmethod
+    def _should_block_unsigned_update(info: dict[str, Any]) -> tuple[bool, str]:
+        if not bool(info.get('signature_required', False)):
+            return False, ''
+        if bool(info.get('artifact_verified', False)):
+            return False, ''
+        reason = str(info.get('artifact_verification_reason') or 'signed update metadata verification failed')
+        return True, reason
 
     @staticmethod
     def _parse_server_ts(raw: object) -> float:
@@ -1400,13 +1412,6 @@ class MessengerAppController(QObject):
             self.current_user['nickname'] = normalized_nickname
             self.current_user['status_message'] = status.strip()
             self.main_window.set_user(self.current_user)
-            self.socket.emit(
-                'profile_updated',
-                {
-                    'nickname': normalized_nickname,
-                    'profile_image': self.current_user.get('profile_image', ''),
-                },
-            )
         except Exception as exc:
             self.main_window.show_error(str(exc))
 
@@ -1613,6 +1618,18 @@ class MessengerAppController(QObject):
         try:
             info = self.update_checker.check()
         except Exception:
+            return
+
+        should_block, reason = self._should_block_unsigned_update(info)
+        if should_block:
+            self.main_window.show_error(
+                t(
+                    'controller.update_signature_required',
+                    'Signed update metadata is required in this environment. ({reason})',
+                    reason=reason,
+                )
+            )
+            self._logout()
             return
 
         if info.get('force_update'):

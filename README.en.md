@@ -31,6 +31,7 @@ python -m client.main --server-url http://127.0.0.1:5000
 - English docs index: `docs/en/README.md`
 - Consistency audit (KO/EN): `docs/ko/CONSISTENCY_AUDIT_20260224.md`, `docs/en/CONSISTENCY_AUDIT_20260224.md`
 - Implementation risk/roadmap: `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`
+- Feature risk review / implementation batch plan: `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
 - Root build/deploy guide: `BUILD_DEPLOY_GUIDE.md`
 - Session guides: `claude.md`, `gemini.md`
 

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-02-27
+최종 업데이트: 2026-03-05
 
 ## 1) 목적
 
@@ -13,8 +13,9 @@
 2. `README.en.md`
 3. `TRANSITION_CHECKLIST.md` (deprecated, 대체: `docs/CUTOVER_ROLLBACK.md`, `docs/OPERATIONS_RUNBOOK.md`)
 4. `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`
-5. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
-6. 관련 구현 파일(작업 범위별):
+5. `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
+6. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
+7. 관련 구현 파일(작업 범위별):
    - 서버: `app/routes.py`, `app/sockets.py`, `app/models/*`
    - 클라이언트: `client/app_controller.py`, `client/ui/*`, `client/services/*`
    - 배포: `messenger.spec`, `messenger_client.spec`, `scripts/build_msi.ps1`
@@ -29,8 +30,9 @@
 - 제품 방향: Desktop-First (Windows 설치형 클라이언트 중심)
 - 아키텍처: `Flask + Socket.IO + SQLite` 서버 + `PySide6` 클라이언트
 - 최신 검증(2026-02-27):
-  - `pytest tests -q` -> `160 passed`
-  - `pytest --maxfail=1` -> `160 passed`
+- 최신 검증(2026-03-05):
+  - `pytest tests -q` -> `173 passed`
+  - `pytest --maxfail=1` -> `173 passed`
 - i18n 적용 기준:
   - 기본 로케일: `ko-KR`
   - 지원 로케일: `en-US`
@@ -101,7 +103,7 @@
 
 1. `ENTERPRISE_AUTH_PROVIDER` 실제 연동(AD/LDAP/SSO) 구현
 2. `UPLOAD_SCAN_PROVIDER` 실스캐너 연동 및 운영 정책 보정
-3. 업데이트 서명/해시 검증 강제 정책(배포 파이프라인 포함) 확정
+3. 업데이트 서명/해시 검증 강제 정책(배포 파이프라인/키관리 포함) 확정
 4. SQLite -> 서버형 RDBMS/외부 MQ 전환 리허설 구체화
 5. DR 리허설 정례화 및 장애주입 시나리오 확대
 
@@ -116,7 +118,7 @@
 
 ## 7) 변경 후 검증 루틴
 
-1. `python -m compileall client`
+1. `python -m compileall app client gui`
 2. `pytest tests -q`
 3. `pytest --maxfail=1`
 4. 수동 확인:
@@ -144,5 +146,5 @@ Then summarize:
 2) risks for this change area,
 3) exact files to edit,
 and execute the change with verification:
-`python -m compileall client`, `pytest tests -q`, `pytest --maxfail=1`.
+`python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1`.
 ```

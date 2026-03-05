@@ -59,7 +59,9 @@ a = Analysis(
     ["client/main.py"],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=[],
+    datas=[
+        ("i18n", "i18n"),
+    ],
     hiddenimports=hiddenimports,
     hookspath=[str(ROOT)],
     hooksconfig={},

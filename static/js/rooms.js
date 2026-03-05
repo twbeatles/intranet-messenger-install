@@ -772,12 +772,6 @@ async function leaveRoom() {
     try {
         await api('/api/rooms/' + currentRoom.id + '/leave', { method: 'POST' });
 
-        // [v4.32] 다른 멤버들에게 멤버 변경 알림
-        // [v4.36] socket safety check
-        if (socket && socket.connected) {
-            safeSocketEmit('room_members_updated', { room_id: leftRoomId });
-        }
-
         currentRoom = null;
         currentRoomKey = null;
 

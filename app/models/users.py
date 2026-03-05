@@ -29,8 +29,19 @@ def create_user(username: str, password: str, nickname: str | None = None) -> in
             'INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)',
             (username, hash_password(password), nickname or username)
         )
+        user_id = int(cursor.lastrowid or 0)
+
+        # 첫 생성 사용자만 플랫폼 관리자 자동 부여
+        cursor.execute('SELECT COUNT(*) AS count FROM users')
+        total_users = int(cursor.fetchone()[0] or 0)
+        if total_users == 1 and user_id > 0:
+            try:
+                cursor.execute('UPDATE users SET is_platform_admin = 1 WHERE id = ?', (user_id,))
+            except Exception as e:
+                logger.debug(f"Platform admin bootstrap in create_user skipped: {e}")
+
         conn.commit()
-        return cursor.lastrowid
+        return user_id
     except sqlite3.IntegrityError:
         logger.warning(f"Username already exists: {username}")
         return None
@@ -194,6 +205,37 @@ def get_user_by_id(user_id: int) -> dict | None:
     except Exception as e:
         logger.error(f"Get user by id error: {e}")
         return None
+
+
+def get_user_by_username(username: str) -> dict | None:
+    """사용자명으로 사용자 조회"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            'SELECT id, username, nickname, profile_image, status FROM users WHERE username = ?',
+            (str(username or '').strip(),),
+        )
+        user = cursor.fetchone()
+        return dict(user) if user else None
+    except Exception as e:
+        logger.error(f"Get user by username error: {e}")
+        return None
+
+
+def is_platform_admin_user(user_id: int) -> bool:
+    """플랫폼 관리자 여부 확인"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT is_platform_admin FROM users WHERE id = ?', (int(user_id),))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        return bool(int(row['is_platform_admin'] or 0))
+    except Exception as e:
+        logger.debug(f"is_platform_admin lookup failed for user_id={user_id}: {e}")
+        return False
 
 
 def get_user_by_id_cached(user_id: int) -> dict | None:

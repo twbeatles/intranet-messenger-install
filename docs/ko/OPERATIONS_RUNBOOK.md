@@ -7,8 +7,8 @@
 1. Python 가상환경 활성화
 2. `python server.py --cli` 실행
 3. 헬스 확인:
-- `GET /api/client/update`
-- `GET /api/system/health`
+- `GET /api/client/update` (`signature_required`, 서명 메타 필드 확인)
+- `GET /api/system/health` (`hardening.warning_count`, `hardening.signature_required_now` 확인)
 - 로그인/메시지 송수신 샘플 점검
 
 ## 2) 클라이언트 기동 체크
@@ -79,6 +79,8 @@
 - `RATE_LIMIT_STORAGE_URI=memory://`: 메모리 기반 레이트리밋 저장소
 - `RATE_LIMIT_KEY_MODE=ip`: IP 기준 레이트리밋 키
 - `UPLOAD_SCAN_ENABLED=False`, `UPLOAD_SCAN_PROVIDER=noop`: 업로드 스캔 스캐폴딩 기본 비활성
+- `ENTERPRISE_AUTH_ENABLED=False`, `ENTERPRISE_AUTH_PROVIDER=\"\"`: 엔터프라이즈 인증 기본 비활성 (`mock` provider 지원)
+- `REQUIRE_SIGNED_UPDATES_IN_PROD=True`: prod 환경에서 업데이트 서명 메타 강제
 
 ## 8) 정기 유지보수 권장 작업
 

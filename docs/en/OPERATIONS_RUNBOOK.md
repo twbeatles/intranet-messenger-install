@@ -7,8 +7,8 @@
 1. activate Python venv
 2. run `python server.py --cli`
 3. verify:
-- `GET /api/client/update`
-- `GET /api/system/health`
+- `GET /api/client/update` (check `signature_required` and signature metadata fields)
+- `GET /api/system/health` (check `hardening.warning_count`, `hardening.signature_required_now`)
 - sample login and message round-trip
 
 ## 2) Client Startup Check
@@ -79,6 +79,8 @@ Recommended frequency:
 - `RATE_LIMIT_STORAGE_URI=memory://`: in-memory rate-limit backend
 - `RATE_LIMIT_KEY_MODE=ip`: IP-based rate-limit key strategy
 - `UPLOAD_SCAN_ENABLED=False`, `UPLOAD_SCAN_PROVIDER=noop`: upload-scan scaffold disabled by default
+- `ENTERPRISE_AUTH_ENABLED=False`, `ENTERPRISE_AUTH_PROVIDER=""`: enterprise auth disabled by default (supports `mock`)
+- `REQUIRE_SIGNED_UPDATES_IN_PROD=True`: enforce signed update metadata in prod
 
 ## 8) Recurring Maintenance
 

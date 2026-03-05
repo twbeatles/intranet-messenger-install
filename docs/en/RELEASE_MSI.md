@@ -64,7 +64,7 @@ Standard procedure for building, validating, and shipping `MessengerClient.msi` 
 - clean environment install/uninstall check
 - server:
   - startup works
-  - `GET /api/client/update` response OK
+  - `GET /api/client/update` response OK (`signature_required`, `artifact_sha256`, `artifact_signature`)
 - client:
   - sign in works
   - tray + auto-login restore works
@@ -76,6 +76,7 @@ Standard procedure for building, validating, and shipping `MessengerClient.msi` 
 7. Publish
 - publish download URL and release notes
 - update runtime update policy in `config.py` (or deployment config)
+- keep `REQUIRE_SIGNED_UPDATES_IN_PROD=True` for production rollout
 
 ## Operational Validation Commands
 
@@ -104,4 +105,4 @@ python -m compileall server.py app client
 | Feature sanity | login/message/file/poll/admin smoke tests pass | [ ] |
 | Auto-login | token refresh after app restart works | [ ] |
 | Code-sign | EXE/MSI signed and hashes recorded | [ ] |
-| Update policy | `/api/client/update` values applied | [ ] |
+| Update policy | `/api/client/update` `signature_required` + signature fields applied | [ ] |

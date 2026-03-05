@@ -614,24 +614,10 @@ def register_socket_events(socketio):
     @socketio.on('room_name_updated')
     def handle_room_name_updated(data):
         try:
-            room_id = data.get('room_id')
-            new_name = data.get('name')
-            if room_id and new_name and 'user_id' in session:
-                # [v4.9] 관리자 권한 확인
-                if not is_room_admin(room_id, session['user_id']):
-                    _emit_error_i18n('관리자만 방 이름을 변경할 수 있습니다.')
-                    return
-                
-                # 시스템 메시지 생성
-                nickname = session.get('nickname', '사용자')
-                content = f"{nickname}님이 방 이름을 '{new_name}'(으)로 변경했습니다."
-                sys_msg = create_message(room_id, session['user_id'], content, 'system')
-                
-                # 시스템 메시지 전송
-                if sys_msg:
-                    emit('new_message', sys_msg, room=f'room_{room_id}')
-                
-                emit('room_name_updated', {'room_id': room_id, 'name': new_name}, room=f'room_{room_id}')
+            if 'user_id' not in session:
+                return
+            logger.warning(f"Ignored client-originated room_name_updated: user={session.get('user_id')}")
+            _emit_error_i18n('잘못된 요청입니다.')
         except Exception as e:
             logger.error(f"Room name update broadcast error: {e}")
     
@@ -639,14 +625,10 @@ def register_socket_events(socketio):
     @socketio.on('room_members_updated')
     def handle_room_members_updated(data):
         try:
-            # [v4.14] 세션 검증 추가
             if 'user_id' not in session:
                 return
-            
-            room_id = data.get('room_id')
-            if room_id:
-                # 관련 사용자들의 캐시 무효화
-                emit('room_members_updated', {'room_id': room_id}, room=f'room_{room_id}')
+            logger.warning(f"Ignored client-originated room_members_updated: user={session.get('user_id')}")
+            _emit_error_i18n('잘못된 요청입니다.')
         except Exception as e:
             logger.error(f"Room members update broadcast error: {e}")
     
@@ -655,18 +637,8 @@ def register_socket_events(socketio):
     def handle_profile_updated(data):
         try:
             if 'user_id' in session:
-                user_id = session['user_id']
-                nickname = data.get('nickname')
-                profile_image = data.get('profile_image')
-                
-                # 모든 클라이언트에게 브로드캐스트 (본인 제외)
-                emit('user_profile_updated', {
-                    'user_id': user_id,
-                    'nickname': nickname,
-                    'profile_image': profile_image
-                }, broadcast=True, include_self=False)
-                
-                logger.info(f"Profile updated broadcast: user_id={user_id}, nickname={nickname}, image={profile_image}")
+                logger.warning(f"Ignored client-originated profile_updated: user={session.get('user_id')}")
+                _emit_error_i18n('잘못된 요청입니다.')
         except Exception as e:
             logger.error(f"Profile update broadcast error: {e}")
 

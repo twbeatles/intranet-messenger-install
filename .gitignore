@@ -119,3 +119,5 @@ Thumbs.db
 Desktop.ini
 *.swp
 *.swo
+*.orig
+*.rej

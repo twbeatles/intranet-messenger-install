@@ -12,6 +12,8 @@ def test_client_update_endpoint_shape(client):
     assert 'latest_version' in payload
     assert 'update_available' in payload
     assert 'force_update' in payload
+    assert 'signature_required' in payload
+    assert payload['signature_required'] is False
     assert payload['client_version'] == '1.0.0'
 
 
@@ -41,3 +43,12 @@ def test_client_update_canary_channel(client, monkeypatch):
     assert payload['download_url'] == 'https://example.invalid/canary'
     assert payload['release_notes_url'] == 'https://example.invalid/canary-notes'
     assert payload['force_update'] is True
+
+
+def test_client_update_signature_required_in_prod(client):
+    client.application.config['APP_ENV'] = 'prod'
+    client.application.config['REQUIRE_SIGNED_UPDATES_IN_PROD'] = True
+    response = client.get('/api/client/update', query_string={'client_version': '1.0.0'})
+    assert response.status_code == 200
+    payload = response.json
+    assert payload['signature_required'] is True

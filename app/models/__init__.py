@@ -33,7 +33,9 @@ from app.models.users import (
     review_user_approval,
     authenticate_user,
     get_user_by_id,
+    get_user_by_username,
     get_user_by_id_cached,
+    is_platform_admin_user,
     invalidate_user_cache,
     get_all_users,
     update_user_status,
@@ -119,9 +121,9 @@ __all__ = [
     'safe_file_delete',
     'close_expired_polls', 'cleanup_old_access_logs', 'cleanup_empty_rooms',
     # Users
-    'create_user', 'authenticate_user', 'get_user_by_id', 'get_user_by_id_cached',
+    'create_user', 'authenticate_user', 'get_user_by_id', 'get_user_by_username', 'get_user_by_id_cached',
     'request_user_approval', 'get_user_approval_status', 'review_user_approval',
-    'invalidate_user_cache', 'get_all_users', 'update_user_status', 'update_user_profile',
+    'is_platform_admin_user', 'invalidate_user_cache', 'get_all_users', 'update_user_status', 'update_user_profile',
     'get_online_users', 'log_access', 'change_password', 'get_user_session_token', 'delete_user',
     # Rooms
     'create_room', 'get_room_key', 'get_user_rooms', 'get_room_members',

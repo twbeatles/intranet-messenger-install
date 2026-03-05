@@ -229,3 +229,30 @@ def test_room_updated_not_emitted_to_unrelated_user(app):
 
     owner_socket.disconnect()
     outsider_socket.disconnect()
+
+
+def test_client_originated_control_events_are_ignored(app):
+    client = app.test_client()
+    _register(client, 'socket_control_guard')
+    _login(client, 'socket_control_guard')
+
+    room_id = _create_room(client, 'Control Guard Room')
+    sc = _socket_client(app, client)
+    assert sc.is_connected()
+    try:
+        sc.get_received()
+
+        sc.emit('room_name_updated', {'room_id': room_id, 'name': 'spoof'})
+        events = sc.get_received()
+        assert not any(evt['name'] == 'room_name_updated' for evt in events)
+        assert not any(evt['name'] == 'new_message' for evt in events)
+
+        sc.emit('room_members_updated', {'room_id': room_id})
+        events = sc.get_received()
+        assert not any(evt['name'] == 'room_members_updated' for evt in events)
+
+        sc.emit('profile_updated', {'nickname': 'spoof', 'profile_image': 'profiles/fake.png'})
+        events = sc.get_received()
+        assert not any(evt['name'] == 'user_profile_updated' for evt in events)
+    finally:
+        sc.disconnect()

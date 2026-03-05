@@ -6,7 +6,7 @@ Flask HTTP 라우트
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, session, send_from_directory, render_template
 from werkzeug.utils import secure_filename
 
@@ -16,7 +16,7 @@ from app.models import (
     add_room_member, leave_room_db, update_room_name, get_room_by_id,
     pin_room, mute_room, get_online_users, delete_message, edit_message,
     search_messages, log_access, get_unread_count, update_user_profile,
-    get_user_by_id, is_room_member, get_db, get_message_room_id,
+    get_user_by_id, get_user_by_username, is_platform_admin_user, is_room_member, get_db, get_message_room_id,
     # v4.0 추가 기능
     pin_message, unpin_message, get_pinned_messages,
     create_poll, get_poll, get_room_polls, vote_poll, get_user_votes, close_poll,
@@ -72,6 +72,7 @@ try:
         ALLOW_SELF_REGISTER,
         ENTERPRISE_AUTH_ENABLED,
         ENTERPRISE_AUTH_PROVIDER,
+        REQUIRE_SIGNED_UPDATES_IN_PROD,
     )
 except ImportError:
     import sys
@@ -99,6 +100,7 @@ except ImportError:
         ALLOW_SELF_REGISTER,
         ENTERPRISE_AUTH_ENABLED,
         ENTERPRISE_AUTH_PROVIDER,
+        REQUIRE_SIGNED_UPDATES_IN_PROD,
     )
 
 logger = logging.getLogger(__name__)
@@ -116,6 +118,59 @@ def register_routes(app):
             except Exception:
                 normalized.append(0)
         return tuple(normalized)  # type: ignore[return-value]
+
+    def _normalize_date_bounds(
+        date_from_raw: str | None,
+        date_to_raw: str | None,
+    ) -> tuple[str | None, str | None]:
+        from_dt = None
+        to_dt = None
+
+        if date_from_raw is not None and str(date_from_raw).strip():
+            if not isinstance(date_from_raw, str):
+                raise ValueError('date_from는 YYYY-MM-DD 형식 문자열이어야 합니다.')
+            normalized = date_from_raw.strip()
+            try:
+                from_dt = datetime.strptime(normalized, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError('date_from 형식이 올바르지 않습니다. YYYY-MM-DD를 사용하세요.')
+
+        if date_to_raw is not None and str(date_to_raw).strip():
+            if not isinstance(date_to_raw, str):
+                raise ValueError('date_to는 YYYY-MM-DD 형식 문자열이어야 합니다.')
+            normalized = date_to_raw.strip()
+            try:
+                to_dt = datetime.strptime(normalized, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError('date_to 형식이 올바르지 않습니다. YYYY-MM-DD를 사용하세요.')
+
+        if from_dt and to_dt and from_dt > to_dt:
+            raise ValueError('date_from은 date_to보다 이후일 수 없습니다.')
+
+        normalized_from = from_dt.strftime('%Y-%m-%d 00:00:00') if from_dt else None
+        normalized_to = (to_dt + timedelta(hours=23, minutes=59, seconds=59)).strftime('%Y-%m-%d %H:%M:%S') if to_dt else None
+        return normalized_from, normalized_to
+
+    def _emit_profile_updated_event(user_id: int) -> None:
+        try:
+            from app import socketio as socketio_instance
+        except Exception:
+            return
+        if socketio_instance is None:
+            return
+
+        user = get_user_by_id(int(user_id)) or {}
+        payload = {
+            'user_id': int(user_id),
+            'nickname': str(user.get('nickname') or ''),
+            'profile_image': str(user.get('profile_image') or ''),
+        }
+        try:
+            socketio_instance.emit('user_profile_updated', payload, broadcast=True, include_self=False)
+        except TypeError:
+            socketio_instance.emit('user_profile_updated', payload)
+        except Exception:
+            return
 
     def _emit_socket_event(
         event: str,
@@ -262,7 +317,7 @@ def register_routes(app):
 
     def _is_platform_admin() -> bool:
         try:
-            return int(session.get('user_id') or 0) == 1
+            return bool(is_platform_admin_user(int(session.get('user_id') or 0)))
         except Exception:
             return False
 
@@ -468,9 +523,49 @@ def register_routes(app):
     def enterprise_login():
         if not bool(app.config.get('ENTERPRISE_AUTH_ENABLED', ENTERPRISE_AUTH_ENABLED)):
             return jsonify({'error': '엔터프라이즈 인증이 비활성화되어 있습니다.'}), 501
-        if not str(app.config.get('ENTERPRISE_AUTH_PROVIDER', ENTERPRISE_AUTH_PROVIDER) or '').strip():
+        provider = str(app.config.get('ENTERPRISE_AUTH_PROVIDER', ENTERPRISE_AUTH_PROVIDER) or '').strip().lower()
+        if not provider:
             return jsonify({'error': '엔터프라이즈 인증 제공자가 구성되지 않았습니다.'}), 400
-        return jsonify({'error': '엔터프라이즈 인증 스캐폴딩만 구현되었습니다.'}), 501
+
+        data = _json_dict()
+        username = str(data.get('username') or '').strip()
+        password = str(data.get('password') or '')
+        if not username or not password:
+            return jsonify({'error': '아이디와 비밀번호를 입력해주세요.'}), 400
+
+        from app.auth.enterprise import authenticate_enterprise
+
+        auth_result = authenticate_enterprise(
+            provider=provider,
+            username=username,
+            password=password,
+            config=app.config,
+        )
+        if not bool(auth_result.get('ok')):
+            return jsonify({'error': str(auth_result.get('error') or '엔터프라이즈 인증에 실패했습니다.')}), int(
+                auth_result.get('status_code') or 401
+            )
+
+        identity = auth_result.get('identity') if isinstance(auth_result.get('identity'), dict) else {}
+        local_username = str(identity.get('username') or username).strip()
+        user = get_user_by_username(local_username)
+        if not user:
+            return jsonify({'error': '로컬 계정이 존재하지 않습니다.'}), 404
+
+        blocked = _approval_gate_for_user(user)
+        if blocked:
+            return blocked
+
+        new_csrf_token = _begin_user_session(user)
+        log_access(user['id'], f'login_enterprise_{provider}', request.remote_addr, request.user_agent.string)
+        return jsonify(
+            {
+                'success': True,
+                'provider': provider,
+                'user': user,
+                'csrf_token': new_csrf_token,
+            }
+        )
 
     @app.route('/api/admin/users/approve', methods=['POST'])
     def admin_approve_user():
@@ -601,6 +696,12 @@ def register_routes(app):
         tls_effective = (os.environ.get('MESSENGER_TLS_EFFECTIVE') or '').strip() == '1'
         if not tls_effective:
             tls_effective = bool(request.is_secure)
+        app_env = str(app.config.get('APP_ENV') or 'dev').strip().lower()
+        require_signed_updates_in_prod = bool(
+            app.config.get('REQUIRE_SIGNED_UPDATES_IN_PROD', REQUIRE_SIGNED_UPDATES_IN_PROD)
+        )
+        signature_required_now = require_signed_updates_in_prod and app_env in ('prod', 'production')
+        hardening_warnings = [str(w) for w in (app.config.get('HARDENING_WARNINGS') or []) if str(w).strip()]
 
         payload = {
             'status': 'ok' if db_ok else 'degraded',
@@ -624,6 +725,13 @@ def register_routes(app):
             'rate_limit': {
                 'storage_uri': str(app.config.get('RATE_LIMIT_STORAGE_URI', 'memory://')),
                 'key_mode': str(app.config.get('RATE_LIMIT_KEY_MODE', 'ip')),
+            },
+            'hardening': {
+                'environment': app_env,
+                'warning_count': len(hardening_warnings),
+                'warnings': hardening_warnings,
+                'require_signed_updates_in_prod': require_signed_updates_in_prod,
+                'signature_required_now': signature_required_now,
             },
         }
         if db_error:
@@ -679,6 +787,10 @@ def register_routes(app):
 
         force_update = current < minimum
         update_available = current < latest
+        app_env = str(app.config.get('APP_ENV') or 'dev').strip().lower()
+        signature_required = bool(
+            app.config.get('REQUIRE_SIGNED_UPDATES_IN_PROD', REQUIRE_SIGNED_UPDATES_IN_PROD)
+        ) and app_env in ('prod', 'production')
 
         response_payload = {
             'channel': channel,
@@ -690,6 +802,7 @@ def register_routes(app):
             'client_version': client_version or None,
             'update_available': update_available,
             'force_update': force_update,
+            'signature_required': signature_required,
         }
         if artifact_sha256:
             response_payload['artifact_sha256'] = artifact_sha256
@@ -1118,8 +1231,8 @@ def register_routes(app):
             return jsonify({'error': '로그인이 필요합니다.'}), 401
     
         query = request.args.get('q')
-        date_from = request.args.get('date_from')
-        date_to = request.args.get('date_to')
+        raw_date_from = request.args.get('date_from')
+        raw_date_to = request.args.get('date_to')
         file_only = str(request.args.get('file_only', '')).lower() in ('1', 'true', 'yes')
         room_id = request.args.get('room_id', type=int)
         offset = request.args.get('offset', type=int)
@@ -1128,12 +1241,17 @@ def register_routes(app):
         limit = min(max(limit if limit is not None else 50, 1), 200)
     
         # If no filters, return empty list (frontend expects list)
-        if (not query or not query.strip()) and not date_from and not date_to and not file_only:
+        if (not query or not query.strip()) and not raw_date_from and not raw_date_to and not file_only:
             return jsonify([])
     
         q = (query or '').strip()
         if q and len(q) < 2:
             return jsonify([])
+
+        try:
+            date_from, date_to = _normalize_date_bounds(raw_date_from, raw_date_to)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
     
         results = advanced_search(
             user_id=session['user_id'],
@@ -1339,6 +1457,7 @@ def register_routes(app):
             # 세션 닉네임도 업데이트
             if nickname:
                 session['nickname'] = nickname
+            _emit_profile_updated_event(int(session['user_id']))
             return jsonify({'success': True})
         return jsonify({'error': '프로필 업데이트에 실패했습니다.'}), 500
     
@@ -1371,6 +1490,15 @@ def register_routes(app):
         file.seek(0)
         if size > 5 * 1024 * 1024:
             return jsonify({'error': '파일 크기는 5MB 이하여야 합니다.'}), 400
+
+        ok, reason = scan_upload_stream(
+            file,
+            filename=str(file.filename or ''),
+            content_type=str(getattr(file, 'content_type', '') or ''),
+        )
+        if not ok:
+            return jsonify({'error': reason or '업로드 스캔 정책에 의해 차단되었습니다.'}), 400
+        file.seek(0)
         
         # 프로필 이미지 폴더 생성
         profile_folder = os.path.join(upload_folder, 'profiles')
@@ -1383,6 +1511,14 @@ def register_routes(app):
         filename = f"{session['user_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
         file_path = os.path.join(profile_folder, filename)
         file.save(file_path)
+        ok, reason = scan_saved_file(
+            file_path,
+            filename=str(file.filename or ''),
+            content_type=str(getattr(file, 'content_type', '') or ''),
+        )
+        if not ok:
+            safe_file_delete(file_path)
+            return jsonify({'error': reason or '업로드 파일 보안 검증에 실패했습니다.'}), 400
 
         # DB 업데이트 성공 이후에만 기존 파일 삭제 (원자성 보강)
         profile_image = f"profiles/{filename}"
@@ -1396,6 +1532,7 @@ def register_routes(app):
                             logger.debug(f"Old profile image deleted: {old_profile_image}")
                     except Exception as e:
                         logger.warning(f"Old profile image deletion failed: {e}")
+                _emit_profile_updated_event(int(session['user_id']))
                 return jsonify({'success': True, 'profile_image': profile_image})
             safe_file_delete(file_path)
             return jsonify({'error': '프로필 이미지 데이터베이스 업데이트 실패'}), 500
@@ -1424,6 +1561,7 @@ def register_routes(app):
         success = update_user_profile(session['user_id'], profile_image='')
         
         if success:
+            _emit_profile_updated_event(int(session['user_id']))
             return jsonify({'success': True})
         return jsonify({'error': '프로필 이미지 삭제에 실패했습니다.'}), 500
     
@@ -1835,22 +1973,8 @@ def register_routes(app):
         except ValueError as e:
             return jsonify({'error': str(e)}), 400
 
-        def _parse_date(name: str):
-            value = data.get(name)
-            if value is None or value == '':
-                return None
-            if not isinstance(value, str):
-                raise ValueError(f'{name}는 YYYY-MM-DD 형식 문자열이어야 합니다.')
-            normalized = value.strip()
-            try:
-                datetime.strptime(normalized, '%Y-%m-%d')
-            except ValueError:
-                raise ValueError(f'{name} 형식이 올바르지 않습니다. YYYY-MM-DD를 사용하세요.')
-            return normalized
-
         try:
-            date_from = _parse_date('date_from')
-            date_to = _parse_date('date_to')
+            date_from, date_to = _normalize_date_bounds(data.get('date_from'), data.get('date_to'))
         except ValueError as e:
             return jsonify({'error': str(e)}), 400
 

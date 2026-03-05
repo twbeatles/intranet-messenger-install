@@ -80,13 +80,14 @@
   - `channel`, `desktop_only_mode`
   - `minimum_version`, `latest_version`
   - `download_url`, `release_notes_url`
+  - `signature_required` (`true` when prod + `REQUIRE_SIGNED_UPDATES_IN_PROD=True`)
   - optional metadata: `artifact_sha256`, `artifact_signature`, `signature_alg`
   - `update_available`, `force_update`
 
 ## Main REST APIs
 
 - Auth: `/api/register`, `/api/login`, `/api/logout`, `/api/me`
-- Enterprise auth (scaffold): `/api/auth/enterprise-login`
+- Enterprise auth: `/api/auth/enterprise-login` (built-in `mock` provider)
 - Approval workflow (scaffold): `/api/admin/users/approve`
 - Users: `/api/users`, `/api/users/online`, `/api/profile`
 - Ops health: `/api/system/health`
@@ -104,6 +105,7 @@
 - Search:
   - `/api/search`
   - `/api/search/advanced`
+  - date boundary rule: `date_from=YYYY-MM-DD` -> `00:00:00`, `date_to=YYYY-MM-DD` -> `23:59:59`
 - Files:
   - `/api/upload`
   - `/uploads/<filename>`
@@ -141,6 +143,7 @@
 - `admin_updated`
 - `edit_message`
 - `delete_message`
+- client-originated control events (`room_name_updated`, `room_members_updated`, `profile_updated`) are rejected.
 
 ### Server -> Client
 
@@ -150,6 +153,7 @@
 - `room_updated`
 - `room_name_updated`
 - `room_members_updated`
+- `user_profile_updated`
 - `message_edited`
 - `message_deleted`
 - `reaction_updated`
@@ -218,12 +222,14 @@ On successful REST operations, server emits canonical socket events directly (sc
 - `POST /api/rooms/<room_id>/polls` -> `poll_created`
 - `POST /api/polls/<poll_id>/vote` / `POST /api/polls/<poll_id>/close` -> `poll_updated`
 - `POST /api/rooms/<room_id>/admins` -> `admin_updated`, `room_members_updated`
+- `PUT /api/profile` / `POST /api/profile/image` / `DELETE /api/profile/image` -> `user_profile_updated`
 
 ## Security Integrity Enhancements
 
 - socket `connect` requires authenticated session
 - `message_read` validates that `message_id` belongs to the given `room_id`
 - `POST /api/rooms/<room_id>/leave` returns `403` for non-members and emits socket events only on actual membership removal
+- client-originated `room_name_updated`, `room_members_updated`, `profile_updated` are ignored/rejected by server
 - reply JOIN in message queries is limited to same room (`rm.room_id = m.room_id`)
 
 ## Version Compatibility

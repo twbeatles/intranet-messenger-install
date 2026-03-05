@@ -59,8 +59,8 @@ def test_advanced_search_normalizes_payload_and_returns_200(client):
     assert kwargs['query'] == 'hello'
     assert kwargs['room_id'] == 7
     assert kwargs['sender_id'] == 3
-    assert kwargs['date_from'] == '2026-02-01'
-    assert kwargs['date_to'] == '2026-02-27'
+    assert kwargs['date_from'] == '2026-02-01 00:00:00'
+    assert kwargs['date_to'] == '2026-02-27 23:59:59'
     assert kwargs['file_only'] is True
     assert kwargs['limit'] == 200
     assert kwargs['offset'] == 0

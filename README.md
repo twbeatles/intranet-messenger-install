@@ -31,6 +31,7 @@ python -m client.main --server-url http://127.0.0.1:5000
 - 영어 문서 인덱스: `docs/en/README.md`
 - 정합성 점검 보고서(KO/EN): `docs/ko/CONSISTENCY_AUDIT_20260224.md`, `docs/en/CONSISTENCY_AUDIT_20260224.md`
 - 구현 리스크/로드맵: `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`
+- 기능 구현 리스크 점검/개선 계획: `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
 - 루트 빌드/배포 가이드: `BUILD_DEPLOY_GUIDE.md`
 - 세션 가이드: `claude.md`, `gemini.md`
 

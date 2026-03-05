@@ -110,14 +110,6 @@ async function saveProfile() {
                 }
             }
 
-            // [v4.21] 소켓으로 프로필 변경 알림 (safeSocketEmit 사용)
-            if (typeof safeSocketEmit === 'function') {
-                safeSocketEmit('profile_updated', {
-                    nickname: currentUser.nickname,
-                    profile_image: currentUser.profile_image
-                });
-            }
-
             showToast(_t('profile.saved', '프로필이 저장되었습니다.'), 'success');
             closeProfileModal();
 
@@ -198,14 +190,6 @@ async function handleProfileImageUpload(e) {
                 }
             }
 
-            // [v4.21] 소켓으로 프로필 변경 알림 (safeSocketEmit 사용)
-            if (typeof safeSocketEmit === 'function') {
-                safeSocketEmit('profile_updated', {
-                    nickname: currentUser.nickname,
-                    profile_image: currentUser.profile_image
-                });
-            }
-
             showToast(_t('profile.image_uploaded', '프로필 사진이 업로드되었습니다.'), 'success');
         } else {
             showToast(_localizedError(result, _t('profile.image_upload_failed', '업로드 실패')), 'error');
@@ -244,14 +228,6 @@ async function deleteProfileImage() {
                     ? currentUser.nickname[0].toUpperCase()
                     : '?';
                 userAvatarEl.classList.remove('has-image');
-            }
-
-            // [v4.21] 소켓으로 프로필 변경 알림 (safeSocketEmit 사용)
-            if (typeof safeSocketEmit === 'function') {
-                safeSocketEmit('profile_updated', {
-                    nickname: currentUser.nickname,
-                    profile_image: null
-                });
             }
 
             showToast(_t('profile.image_deleted', '프로필 사진이 삭제되었습니다.'), 'success');

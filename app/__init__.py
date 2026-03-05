@@ -53,7 +53,7 @@ except Exception:  # pragma: no cover
 try:
     from config import (
         BASE_DIR, DATABASE_PATH, UPLOAD_FOLDER, MAX_CONTENT_LENGTH,
-        SESSION_TIMEOUT_HOURS, APP_NAME, VERSION, USE_HTTPS,
+        SESSION_TIMEOUT_HOURS, APP_NAME, VERSION, USE_HTTPS, APP_ENV,
         STATIC_FOLDER, TEMPLATE_FOLDER,
         ASYNC_MODE, PING_TIMEOUT, PING_INTERVAL, MAX_HTTP_BUFFER_SIZE,
         MAX_CONNECTIONS, MESSAGE_QUEUE,
@@ -62,8 +62,9 @@ try:
         SESSION_TOKEN_FAIL_OPEN,
         ENFORCE_HTTPS, ALLOW_SELF_REGISTER,
         UPLOAD_SCAN_ENABLED, UPLOAD_SCAN_PROVIDER,
-        ENTERPRISE_AUTH_ENABLED, ENTERPRISE_AUTH_PROVIDER,
+        ENTERPRISE_AUTH_ENABLED, ENTERPRISE_AUTH_PROVIDER, ENTERPRISE_MOCK_USERS,
         REQUIRE_MESSAGE_ENCRYPTION,
+        REQUIRE_SIGNED_UPDATES_IN_PROD,
     )
 except ImportError:
     # 패키징된 환경에서 상대 경로 시도
@@ -71,7 +72,7 @@ except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from config import (
         BASE_DIR, DATABASE_PATH, UPLOAD_FOLDER, MAX_CONTENT_LENGTH,
-        SESSION_TIMEOUT_HOURS, APP_NAME, VERSION, USE_HTTPS,
+        SESSION_TIMEOUT_HOURS, APP_NAME, VERSION, USE_HTTPS, APP_ENV,
         STATIC_FOLDER, TEMPLATE_FOLDER,
         ASYNC_MODE, PING_TIMEOUT, PING_INTERVAL, MAX_HTTP_BUFFER_SIZE,
         MAX_CONNECTIONS, MESSAGE_QUEUE,
@@ -80,8 +81,9 @@ except ImportError:
         SESSION_TOKEN_FAIL_OPEN,
         ENFORCE_HTTPS, ALLOW_SELF_REGISTER,
         UPLOAD_SCAN_ENABLED, UPLOAD_SCAN_PROVIDER,
-        ENTERPRISE_AUTH_ENABLED, ENTERPRISE_AUTH_PROVIDER,
+        ENTERPRISE_AUTH_ENABLED, ENTERPRISE_AUTH_PROVIDER, ENTERPRISE_MOCK_USERS,
         REQUIRE_MESSAGE_ENCRYPTION,
+        REQUIRE_SIGNED_UPDATES_IN_PROD,
     )
 
 # 로깅 설정
@@ -140,6 +142,7 @@ def create_app():
     runtime_upload_folder = UPLOAD_FOLDER
     runtime_rate_limit_storage_uri = RATE_LIMIT_STORAGE_URI
     runtime_rate_limit_key_mode = RATE_LIMIT_KEY_MODE
+    runtime_app_env = str(APP_ENV or 'dev').strip().lower()
     runtime_session_token_fail_open = SESSION_TOKEN_FAIL_OPEN
     runtime_enforce_https = ENFORCE_HTTPS
     runtime_allow_self_register = ALLOW_SELF_REGISTER
@@ -147,10 +150,15 @@ def create_app():
     runtime_upload_scan_provider = UPLOAD_SCAN_PROVIDER
     runtime_enterprise_auth_enabled = ENTERPRISE_AUTH_ENABLED
     runtime_enterprise_auth_provider = ENTERPRISE_AUTH_PROVIDER
+    runtime_enterprise_mock_users = ENTERPRISE_MOCK_USERS
     runtime_require_message_encryption = REQUIRE_MESSAGE_ENCRYPTION
+    runtime_require_signed_updates_in_prod = REQUIRE_SIGNED_UPDATES_IN_PROD
     try:
         import config as runtime_config  # type: ignore
 
+        runtime_app_env = str(
+            getattr(runtime_config, 'APP_ENV', runtime_app_env) or runtime_app_env
+        ).strip().lower()
         runtime_upload_folder = str(
             getattr(runtime_config, 'UPLOAD_FOLDER', runtime_upload_folder) or runtime_upload_folder
         )
@@ -185,8 +193,20 @@ def create_app():
             getattr(runtime_config, 'ENTERPRISE_AUTH_PROVIDER', runtime_enterprise_auth_provider)
             or runtime_enterprise_auth_provider
         )
+        runtime_enterprise_mock_users = getattr(
+            runtime_config,
+            'ENTERPRISE_MOCK_USERS',
+            runtime_enterprise_mock_users,
+        )
         runtime_require_message_encryption = bool(
             getattr(runtime_config, 'REQUIRE_MESSAGE_ENCRYPTION', runtime_require_message_encryption)
+        )
+        runtime_require_signed_updates_in_prod = bool(
+            getattr(
+                runtime_config,
+                'REQUIRE_SIGNED_UPDATES_IN_PROD',
+                runtime_require_signed_updates_in_prod,
+            )
         )
     except Exception:
         pass
@@ -244,6 +264,7 @@ def create_app():
     app.config['RATELIMIT_STORAGE_URI'] = runtime_rate_limit_storage_uri
     app.config['RATE_LIMIT_STORAGE_URI'] = runtime_rate_limit_storage_uri
     app.config['RATE_LIMIT_KEY_MODE'] = runtime_rate_limit_key_mode
+    app.config['APP_ENV'] = runtime_app_env
     app.config['SESSION_TOKEN_FAIL_OPEN'] = runtime_session_token_fail_open
     app.config['ENFORCE_HTTPS'] = runtime_enforce_https
     app.config['ALLOW_SELF_REGISTER'] = runtime_allow_self_register
@@ -251,7 +272,30 @@ def create_app():
     app.config['UPLOAD_SCAN_PROVIDER'] = runtime_upload_scan_provider
     app.config['ENTERPRISE_AUTH_ENABLED'] = runtime_enterprise_auth_enabled
     app.config['ENTERPRISE_AUTH_PROVIDER'] = runtime_enterprise_auth_provider
+    if isinstance(runtime_enterprise_mock_users, dict):
+        app.config['ENTERPRISE_MOCK_USERS'] = dict(runtime_enterprise_mock_users)
+    else:
+        app.config['ENTERPRISE_MOCK_USERS'] = runtime_enterprise_mock_users
     app.config['REQUIRE_MESSAGE_ENCRYPTION'] = runtime_require_message_encryption
+    app.config['REQUIRE_SIGNED_UPDATES_IN_PROD'] = runtime_require_signed_updates_in_prod
+
+    is_prod_env = runtime_app_env in ('prod', 'production')
+    hardening_warnings: list[str] = []
+    if is_prod_env:
+        if not runtime_enforce_https:
+            hardening_warnings.append('ENFORCE_HTTPS=False')
+        if not runtime_require_message_encryption:
+            hardening_warnings.append('REQUIRE_MESSAGE_ENCRYPTION=False')
+        if runtime_session_token_fail_open:
+            hardening_warnings.append('SESSION_TOKEN_FAIL_OPEN=True')
+        if not runtime_upload_scan_enabled:
+            hardening_warnings.append('UPLOAD_SCAN_ENABLED=False')
+        if not runtime_require_signed_updates_in_prod:
+            hardening_warnings.append('REQUIRE_SIGNED_UPDATES_IN_PROD=False')
+    app.config['HARDENING_WARNINGS'] = hardening_warnings
+    if hardening_warnings:
+        for warning in hardening_warnings:
+            logger.warning(f"[hardening:{runtime_app_env}] {warning}")
     
     # [v4.6+] Server-Side Session (CacheLib backend)
     session_dir = os.path.join(BASE_DIR, 'flask_session')

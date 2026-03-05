@@ -65,7 +65,7 @@
 - 클린 환경에서 설치/삭제 정상 동작 확인
 - 서버:
   - 기동 가능 여부
-  - `GET /api/client/update` 응답 확인
+  - `GET /api/client/update` 응답 확인 (`signature_required`, `artifact_sha256`, `artifact_signature`)
 - 클라이언트:
   - 로그인 가능 여부
   - 트레이 실행/자동 로그인 복원 확인
@@ -77,6 +77,7 @@
 7. 릴리즈 노트/배포
 - 배포 URL 및 릴리즈 노트를 공개
 - `config.py` 또는 운영 설정으로 업데이트 정책 반영
+- 운영(prod) 배포 시 `REQUIRE_SIGNED_UPDATES_IN_PROD=True` 유지
 
 ## 운영 체크 명령
 
@@ -105,5 +106,5 @@ python -m compileall server.py app client
 | 기능 검증 | 로그인/메시지/파일/투표/관리자 확인 | [ ] |
 | 자동로그인 검증 | 앱 재시작 후 토큰 refresh | [ ] |
 | 코드서명 | EXE/MSI 서명 및 해시 기록 | [ ] |
-| 배포 정책 반영 | `/api/client/update` 값 반영 | [ ] |
+| 배포 정책 반영 | `/api/client/update`의 `signature_required`/서명 필드 반영 | [ ] |
 

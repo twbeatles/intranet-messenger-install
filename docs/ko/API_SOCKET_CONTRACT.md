@@ -80,13 +80,14 @@
   - `channel`, `desktop_only_mode`
   - `minimum_version`, `latest_version`
   - `download_url`, `release_notes_url`
+  - `signature_required` (prod + `REQUIRE_SIGNED_UPDATES_IN_PROD=True`일 때 `true`)
   - 선택 메타: `artifact_sha256`, `artifact_signature`, `signature_alg`
   - `update_available`, `force_update`
 
 ## 주요 REST API
 
 - 인증: `/api/register`, `/api/login`, `/api/logout`, `/api/me`
-- 엔터프라이즈 인증(스캐폴딩): `/api/auth/enterprise-login`
+- 엔터프라이즈 인증: `/api/auth/enterprise-login` (`mock` provider 기본 지원)
 - 승인 워크플로(스캐폴딩): `/api/admin/users/approve`
 - 사용자: `/api/users`, `/api/users/online`, `/api/profile`
 - 운영 헬스: `/api/system/health`
@@ -104,6 +105,7 @@
 - 검색:
   - `/api/search`
   - `/api/search/advanced`
+  - 날짜 경계 규칙: `date_from=YYYY-MM-DD` -> `00:00:00`, `date_to=YYYY-MM-DD` -> `23:59:59`
 - 파일:
   - `/api/upload`
   - `/uploads/<filename>`
@@ -141,6 +143,7 @@
 - `admin_updated`
 - `edit_message`
 - `delete_message`
+- 서버 제어 이벤트(`room_name_updated`, `room_members_updated`, `profile_updated`)의 클라이언트 발신은 거부됩니다.
 
 ### 서버 -> 클라이언트
 
@@ -150,6 +153,7 @@
 - `room_updated`
 - `room_name_updated`
 - `room_members_updated`
+- `user_profile_updated`
 - `message_edited`
 - `message_deleted`
 - `reaction_updated`
@@ -218,12 +222,14 @@
 - `POST /api/rooms/<room_id>/polls` -> `poll_created`
 - `POST /api/polls/<poll_id>/vote` / `POST /api/polls/<poll_id>/close` -> `poll_updated`
 - `POST /api/rooms/<room_id>/admins` -> `admin_updated`, `room_members_updated`
+- `PUT /api/profile` / `POST /api/profile/image` / `DELETE /api/profile/image` -> `user_profile_updated`
 
 ## 보안 정합성 보강 항목
 
 - 소켓 `connect`에서 인증 세션 필수
 - `message_read`는 `message_id`가 해당 `room_id` 소속인지 검증
 - `POST /api/rooms/<room_id>/leave`는 멤버십이 없으면 `403`이며, 실제 퇴장 성공 시에만 소켓 이벤트 emit
+- 클라이언트가 보내는 `room_name_updated`, `room_members_updated`, `profile_updated`는 서버에서 무시/거부
 - 메시지 조회 SQL의 답장 JOIN은 동일 방(`rm.room_id = m.room_id`)으로 제한
 
 ## 버전 호환
