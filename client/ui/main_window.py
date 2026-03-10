@@ -339,6 +339,8 @@ class MainWindow(QMainWindow):
 
         for room in rooms:
             room_id = room.get('id')
+            if room_id is None:
+                continue
             try:
                 normalized_room_id = int(room_id)
             except (TypeError, ValueError):
@@ -679,7 +681,7 @@ class MainWindow(QMainWindow):
             fg = avatar_text_color(bg)
             avatar_label = QLabel(sender[0].upper() if sender else "?")
             avatar_label.setFixedSize(40, 40)
-            avatar_label.setAlignment(Qt.AlignCenter)
+            avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             avatar_label.setStyleSheet(
                 f"background-color: {bg}; color: {fg}; border-radius: 20px;"
                 " font-weight: bold; font-size: 14pt;"
@@ -919,7 +921,7 @@ class MainWindow(QMainWindow):
         fg = avatar_text_color(bg)
         avatar_label = QLabel(name[0].upper() if name else "?")
         avatar_label.setFixedSize(44, 44)
-        avatar_label.setAlignment(Qt.AlignCenter)
+        avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar_label.setStyleSheet(
             f"background-color: {bg}; color: {fg}; border-radius: 22px;"
             " font-weight: bold; font-size: 14pt;"

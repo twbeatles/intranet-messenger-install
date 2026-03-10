@@ -214,7 +214,7 @@ def get_upload_token_failure_reason(
     token: str,
     user_id: int,
     room_id: int,
-    expected_type: str = None,
+    expected_type: str | None = None,
 ) -> str:
     """업로드 토큰 검증 실패 사유 조회 (소비하지 않음)"""
     if not token or not isinstance(token, str):
@@ -258,7 +258,7 @@ def consume_upload_token(
     token: str,
     user_id: int,
     room_id: int,
-    expected_type: str = None,
+    expected_type: str | None = None,
 ):
     """업로드 토큰 1회 소비"""
     if not token or not isinstance(token, str):

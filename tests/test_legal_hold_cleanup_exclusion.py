@@ -17,7 +17,9 @@ def test_legal_hold_excludes_access_log_cleanup(app):
             ''',
             (int(user_id),),
         )
-        held_log_id = int(cursor.lastrowid)
+        held_log_row_id = cursor.lastrowid
+        assert held_log_row_id is not None
+        held_log_id = int(held_log_row_id)
 
         cursor.execute(
             '''
@@ -26,7 +28,9 @@ def test_legal_hold_excludes_access_log_cleanup(app):
             ''',
             (int(user_id),),
         )
-        removable_log_id = int(cursor.lastrowid)
+        removable_log_row_id = cursor.lastrowid
+        assert removable_log_row_id is not None
+        removable_log_id = int(removable_log_row_id)
 
         cursor.execute(
             '''

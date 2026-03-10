@@ -33,8 +33,8 @@ class TrayManager(QObject):
         pix.fill(QColor('#1f2937'))
         painter = QPainter(pix)
         painter.setPen(QColor('#10b981'))
-        painter.setFont(QFont('Segoe UI', 18, QFont.Bold))
-        painter.drawText(pix.rect(), Qt.AlignCenter, 'M')
+        painter.setFont(QFont('Segoe UI', 18, QFont.Weight.Bold))
+        painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, 'M')
         painter.end()
         return QIcon(pix)
 
@@ -76,4 +76,4 @@ class TrayManager(QObject):
         self._tray.hide()
 
     def notify(self, title: str, message: str) -> None:
-        self._tray.showMessage(title, message, QSystemTrayIcon.Information, 2500)
+        self._tray.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, 2500)

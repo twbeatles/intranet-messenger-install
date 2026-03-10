@@ -7,6 +7,7 @@ import os
 import uuid
 import logging
 from datetime import datetime, timedelta
+from typing import Any, cast
 from flask import Blueprint, request, jsonify, session, send_from_directory, render_template
 from werkzeug.utils import secure_filename
 
@@ -109,6 +110,24 @@ logger = logging.getLogger(__name__)
 def register_routes(app):
     """라우트 등록"""
 
+    def _socketio_emit(
+        socketio_instance: Any,
+        event: str,
+        payload: dict[str, Any],
+        *,
+        room: str | None = None,
+        broadcast: bool = False,
+        include_self: bool | None = None,
+    ) -> None:
+        kwargs: dict[str, Any] = {}
+        if room is not None:
+            kwargs['room'] = room
+        if broadcast:
+            kwargs['broadcast'] = True
+        if include_self is not None:
+            kwargs['include_self'] = include_self
+        cast(Any, socketio_instance).emit(event, payload, **kwargs)
+
     def _parse_version(version: str) -> tuple[int, int, int]:
         parts = (version or '0.0.0').strip().split('.')
         normalized = []
@@ -166,7 +185,13 @@ def register_routes(app):
             'profile_image': str(user.get('profile_image') or ''),
         }
         try:
-            socketio_instance.emit('user_profile_updated', payload, broadcast=True, include_self=False)
+            _socketio_emit(
+                socketio_instance,
+                'user_profile_updated',
+                payload,
+                broadcast=True,
+                include_self=False,
+            )
         except TypeError:
             socketio_instance.emit('user_profile_updated', payload)
         except Exception:
@@ -192,7 +217,7 @@ def register_routes(app):
         emitted = False
         body = payload or {}
         if room_id is not None:
-            socketio_instance.emit(event, body, room=f'room_{int(room_id)}')
+            _socketio_emit(socketio_instance, event, body, room=f'room_{int(room_id)}')
             emitted = True
 
         if user_ids:
@@ -205,7 +230,7 @@ def register_routes(app):
                 if normalized <= 0 or normalized in seen_user_ids:
                     continue
                 seen_user_ids.add(normalized)
-                socketio_instance.emit(event, body, room=f'user_{normalized}')
+                _socketio_emit(socketio_instance, event, body, room=f'user_{normalized}')
                 emitted = True
 
         # Backward-compatible fallback.
@@ -541,12 +566,15 @@ def register_routes(app):
             password=password,
             config=app.config,
         )
+        if not isinstance(auth_result, dict):
+            auth_result = {}
         if not bool(auth_result.get('ok')):
             return jsonify({'error': str(auth_result.get('error') or '엔터프라이즈 인증에 실패했습니다.')}), int(
                 auth_result.get('status_code') or 401
             )
 
-        identity = auth_result.get('identity') if isinstance(auth_result.get('identity'), dict) else {}
+        identity_value = auth_result.get('identity')
+        identity = identity_value if isinstance(identity_value, dict) else {}
         local_username = str(identity.get('username') or username).strip()
         user = get_user_by_username(local_username)
         if not user:
@@ -579,6 +607,8 @@ def register_routes(app):
         action = str(data.get('action') or '').strip().lower()
         reason = str(data.get('reason') or '').strip()
 
+        if target_user_id is None:
+            return jsonify({'error': '유효한 사용자 ID가 필요합니다.'}), 400
         try:
             target_user_id = int(target_user_id)
         except (TypeError, ValueError):
@@ -951,7 +981,7 @@ def register_routes(app):
                         unread = 0
                     msg['unread_count'] = unread
             
-            resp = {'messages': messages}
+            resp: dict[str, Any] = {'messages': messages}
             if include_meta:
                 resp['members'] = members
                 resp['encryption_key'] = encryption_key
@@ -1269,7 +1299,7 @@ def register_routes(app):
     def upload_file():
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
-        upload_folder = app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER)
+        upload_folder = str(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER) or UPLOAD_FOLDER)
 
         room_id = request.form.get('room_id', type=int)
         if not room_id:
@@ -1286,13 +1316,14 @@ def register_routes(app):
             return jsonify({'error': '파일이 없습니다.'}), 400
         
         file = request.files['file']
-        if file.filename == '':
+        raw_filename = str(file.filename or '')
+        if raw_filename == '':
             return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
         
-        if file and allowed_file(file.filename):
+        if file and allowed_file(raw_filename):
             # [v4.3] 파일 내용 검증 (Magic Number)
             if not validate_file_header(file):
-                logger.warning(f"File signature mismatch: {file.filename}")
+                logger.warning(f"File signature mismatch: {raw_filename}")
                 return jsonify({'error': '파일 내용이 확장자와 일치하지 않습니다.'}), 400
 
             ok, reason = scan_upload_stream(
@@ -1303,7 +1334,7 @@ def register_routes(app):
             if not ok:
                 return jsonify({'error': reason or '업로드 스캔 정책에 의해 차단되었습니다.'}), 400
 
-            filename = secure_filename(file.filename)
+            filename = secure_filename(raw_filename)
             # [v4.14] UUID 추가로 동시 업로드 시 파일명 충돌 방지
             unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}_{filename}"
             file_path = os.path.join(upload_folder, unique_filename)
@@ -1345,7 +1376,7 @@ def register_routes(app):
         # 인증 확인
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
-        upload_folder = app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER)
+        upload_folder = str(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER) or UPLOAD_FOLDER)
 
         # 파일명 정규화
         safe_filename = secure_filename(os.path.basename(filename))
@@ -1465,18 +1496,19 @@ def register_routes(app):
     def upload_profile_image():
         if 'user_id' not in session:
             return jsonify({'error': '로그인이 필요합니다.'}), 401
-        upload_folder = app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER)
+        upload_folder = str(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER) or UPLOAD_FOLDER)
         
         if 'file' not in request.files:
             return jsonify({'error': '파일이 없습니다.'}), 400
         
         file = request.files['file']
-        if file.filename == '':
+        raw_filename = str(file.filename or '')
+        if raw_filename == '':
             return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
         
         # 이미지 파일만 허용
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        ext = raw_filename.rsplit('.', 1)[-1].lower() if '.' in raw_filename else ''
         if ext not in allowed_extensions:
             return jsonify({'error': '이미지 파일만 업로드 가능합니다.'}), 400
         
@@ -1593,7 +1625,16 @@ def register_routes(app):
         if not message_id and not content:
             return jsonify({'error': '고정할 메시지 또는 내용을 입력해주세요.'}), 400
         
-        pin_id = pin_message(room_id, session['user_id'], message_id, content)
+        normalized_message_id: int | None
+        if message_id is None or message_id == '':
+            normalized_message_id = None
+        else:
+            try:
+                normalized_message_id = int(message_id)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'message_id는 정수여야 합니다.'}), 400
+
+        pin_id = pin_message(room_id, session['user_id'], normalized_message_id, content)
         if pin_id:
             _emit_socket_event(
                 'pin_updated',
@@ -1743,6 +1784,8 @@ def register_routes(app):
         success, error = vote_poll(poll_id, selected, session['user_id'])
         if success:
             poll = get_poll(poll_id)
+            if not poll:
+                return jsonify({'error': '투표 정보를 불러오지 못했습니다.'}), 500
             poll['my_votes'] = get_user_votes(poll_id, session['user_id'])
             _emit_socket_event(
                 'poll_updated',

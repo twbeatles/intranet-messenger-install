@@ -19,14 +19,14 @@
 ## 2) 사전 준비
 
 1. Windows 10/11
-2. Python 3.10+ 및 가상환경
+2. Python 3.11 권장 (CI/정적 분석 기준) 및 가상환경
 3. 의존성 설치
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-pip install pyinstaller
+pip install pyinstaller pyright
 ```
 
 4. WiX Toolset v4 설치 (`wix` 명령 사용 가능해야 함)
@@ -53,6 +53,10 @@ wix --version
 `spec` 파일 기준:
 - 서버: `messenger.spec`
 - 클라이언트: `messenger_client.spec`
+
+spec 정합성 메모:
+- `messenger.spec`는 `server.py` 엔트리와 `app/**`, `gui/**`, `static/`, `templates/`, `i18n/`, `certs/`를 포함합니다.
+- `messenger_client.spec`는 `client/main.py` 엔트리와 `client/**`, `i18n/`를 포함합니다.
 
 ## 4) MSI 빌드
 
@@ -107,9 +111,14 @@ WiX 정의 파일:
 ## 6) 배포 전 검증 체크
 
 ```powershell
+pyright
 pytest tests -q
 python -m compileall app client gui
 ```
+
+인코딩 기준:
+- 작업 파일은 UTF-8로 유지합니다.
+- 워크스페이스 기본값은 `.editorconfig`, `.vscode/settings.json`에 고정되어 있습니다.
 
 필수 수동 검증:
 - 로그인/자동로그인 복원

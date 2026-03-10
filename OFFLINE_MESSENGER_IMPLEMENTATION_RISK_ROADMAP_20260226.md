@@ -30,4 +30,5 @@
 
 ## 추적 규칙
 - 계약 변경(API/소켓/보안)은 테스트와 문서를 함께 갱신한다.
+- 정적 분석 기준(`pyrightconfig.json`)과 UTF-8 워크스페이스 기준(`.editorconfig`, `.vscode/settings.json`)도 문서와 함께 유지한다.
 - prod 하드닝 이슈는 `docs/OPERATIONS_RUNBOOK.md`와 동기화한다.

@@ -4,7 +4,7 @@
 
 - 클라이언트: Windows 10/11
 - 서버: Windows 우선 (Linux도 Python 실행 가능)
-- Python: 3.10+
+- Python: 3.11 권장 (CI/정적 분석 기준)
 
 ## 1) 개발 환경 준비
 
@@ -12,6 +12,7 @@
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install pyright
 ```
 
 ## 2) 서버 실행
@@ -82,6 +83,12 @@ python -m client.main --server-url http://127.0.0.1:5000
 
 ## 7) 테스트
 
+정적 분석:
+
+```powershell
+pyright
+```
+
 전체:
 
 ```powershell
@@ -103,3 +110,4 @@ pytest tests\test_device_sessions_api.py tests\test_client_update_api.py tests\t
   - `DESKTOP_CLIENT_DOWNLOAD_URL`
   - `USE_HTTPS`
 - `messenger.db`, `uploads/`, 인증 키 파일(`.secret_key`, `.security_salt`) 백업 정책 적용
+- 저장소의 UTF-8 기본값은 `.editorconfig`, `.vscode/settings.json`에 고정되어 있으므로 ANSI/CP949로 저장하지 않음

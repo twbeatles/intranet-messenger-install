@@ -53,7 +53,7 @@ def derive_v2_keys(passphrase: str, salt: bytes, iterations: int = 10000) -> V2K
         raise CryptoError('salt must be 16 bytes')
 
     derived = PBKDF2(
-        password=passphrase.encode('utf-8'),
+        password=passphrase,
         salt=salt,
         dkLen=64,
         count=iterations,

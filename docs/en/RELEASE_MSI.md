@@ -9,7 +9,7 @@ Standard procedure for building, validating, and shipping `MessengerClient.msi` 
 ## Prerequisites
 
 - OS: Windows 10/11
-- Python 3.10+
+- Python 3.11 recommended (CI/static-analysis baseline)
 - dependencies installed: `pip install -r requirements.txt`
 - WiX Toolset v4 (`wix` CLI)
 - code-signing certificate (required for production)
@@ -81,11 +81,15 @@ Standard procedure for building, validating, and shipping `MessengerClient.msi` 
 ## Operational Validation Commands
 
 ```powershell
+pyright
+```
+
+```powershell
 pytest tests\test_device_sessions_api.py tests\test_client_update_api.py tests\test_crypto_compat_client.py tests\test_upload_contract_desktop.py -q
 ```
 
 ```powershell
-python -m compileall server.py app client
+python -m compileall app client gui
 ```
 
 ## Failure Checklist

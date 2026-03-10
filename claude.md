@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-03-05
+최종 업데이트: 2026-03-10
 
 ## 1) 목적
 
@@ -29,10 +29,15 @@
 
 - 제품 방향: Desktop-First (Windows 설치형 클라이언트 중심)
 - 아키텍처: `Flask + Socket.IO + SQLite` 서버 + `PySide6` 클라이언트
-- 최신 검증(2026-02-27):
 - 최신 검증(2026-03-05):
   - `pytest tests -q` -> `173 passed`
   - `pytest --maxfail=1` -> `173 passed`
+- 최신 검증(2026-03-10):
+  - `pyright` -> `0 errors`
+  - `pytest tests -q` -> `174 passed`
+- 정적 분석/에디터 기준:
+  - `pyrightconfig.json` (`typeCheckingMode: standard`, Python `3.11`)
+  - `.editorconfig`, `.vscode/settings.json` (UTF-8 / workspace Pylance baseline)
 - i18n 적용 기준:
   - 기본 로케일: `ko-KR`
   - 지원 로케일: `en-US`
@@ -118,10 +123,11 @@
 
 ## 7) 변경 후 검증 루틴
 
-1. `python -m compileall app client gui`
-2. `pytest tests -q`
-3. `pytest --maxfail=1`
-4. 수동 확인:
+1. `pyright`
+2. `python -m compileall app client gui`
+3. `pytest tests -q`
+4. `pytest --maxfail=1`
+5. 수동 확인:
    - 자동 로그인 복원(앱 재시작)
    - 파일 업로드 후 `upload_token` 연계 전송
    - 룸 입장 후 소켓 메시지 수신/읽음 반영
@@ -146,5 +152,5 @@ Then summarize:
 2) risks for this change area,
 3) exact files to edit,
 and execute the change with verification:
-`python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1`.
+`pyright`, `python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1`.
 ```

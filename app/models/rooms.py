@@ -145,7 +145,7 @@ def get_user_rooms(user_id, include_members=False):
         if not rooms:
             return []
 
-        # UI? last_message_preview ?? + ???(content) ?? ??
+        # UI preview용 last_message_preview를 계산하고, 암호화 본문은 노출하지 않는다.
         for room in rooms:
             last_type = room.get('last_message_type') or 'text'
             last_message = room.get('last_message')
@@ -170,7 +170,7 @@ def get_user_rooms(user_id, include_members=False):
 
             room['last_message_preview'] = preview
 
-        # direct ?? partner ?? + (??) group ?? ??
+        # direct 방은 상대방 정보를 붙이고, 그룹방은 필요 시 멤버 목록을 포함한다.
         direct_room_ids = [r['id'] for r in rooms if r.get('type') == 'direct']
         group_room_ids = [r['id'] for r in rooms if r.get('type') != 'direct']
 

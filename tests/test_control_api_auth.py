@@ -30,7 +30,9 @@ def test_control_api_requires_token_and_localhost():
                 environ_base={'REMOTE_ADDR': '127.0.0.1'},
             )
             assert r.status_code == 200
-            assert r.json.get('status') == 'running'
+            payload = r.get_json()
+            assert isinstance(payload, dict)
+            assert payload.get('status') == 'running'
 
             # Token but non-localhost => 403
             r = client.get(

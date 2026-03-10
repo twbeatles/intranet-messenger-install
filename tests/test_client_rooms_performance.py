@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from client.app_controller import MessengerAppController
 
 
@@ -32,9 +34,9 @@ class _FakeApi:
 
 def _controller() -> MessengerAppController:
     controller = MessengerAppController.__new__(MessengerAppController)
-    controller.main_window = _FakeMainWindow()
-    controller.socket = _FakeSocket()
-    controller.api = _FakeApi()
+    controller.main_window = cast(Any, _FakeMainWindow())
+    controller.socket = cast(Any, _FakeSocket())
+    controller.api = cast(Any, _FakeApi())
     controller.rooms_cache = []
     controller.current_room_id = None
     controller._visible_rooms_signature = None
@@ -50,11 +52,12 @@ def test_set_rooms_view_skips_redundant_rerender():
 
     rendered = controller._set_rooms_view(rooms)
     assert rendered is True
-    assert len(controller.main_window.calls) == 1
+    main_window = cast(_FakeMainWindow, controller.main_window)
+    assert len(main_window.calls) == 1
 
     rendered_again = controller._set_rooms_view([dict(rooms[0])])
     assert rendered_again is False
-    assert len(controller.main_window.calls) == 1
+    assert len(main_window.calls) == 1
 
 
 def test_sync_socket_room_subscriptions_only_when_changed():
@@ -64,7 +67,8 @@ def test_sync_socket_room_subscriptions_only_when_changed():
     controller._sync_socket_room_subscriptions([{'id': 2}, {'id': 1}, {'id': 3}])
     controller._sync_socket_room_subscriptions([{'id': 1}, {'id': 4}])
 
-    assert controller.socket.calls == [[1, 2, 3], [1, 4]]
+    socket = cast(_FakeSocket, controller.socket)
+    assert socket.calls == [[1, 2, 3], [1, 4]]
 
 
 def test_remote_search_cache_reuses_previous_lookup():
@@ -77,4 +81,5 @@ def test_remote_search_cache_reuses_previous_lookup():
     controller._on_search_requested('zz')
     controller._on_search_requested('zz')
 
-    assert controller.api.calls == 1
+    api = cast(_FakeApi, controller.api)
+    assert api.calls == 1

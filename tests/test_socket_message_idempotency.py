@@ -28,11 +28,15 @@ def test_send_message_is_idempotent_by_client_msg_id(app):
     _register(client, 'idem_peer')
     _login(client, 'idem_owner')
 
-    users = client.get('/api/users').json
+    users_payload = client.get('/api/users').get_json()
+    assert isinstance(users_payload, list)
+    users = users_payload
     peer = next(u for u in users if u['username'] == 'idem_peer')
     created = client.post('/api/rooms', json={'name': 'Idempotency', 'members': [peer['id']]})
     assert created.status_code == 200
-    room_id = int(created.json['room_id'])
+    created_payload = created.get_json()
+    assert isinstance(created_payload, dict)
+    room_id = int(created_payload['room_id'])
 
     socket_client = socketio.test_client(app, flask_test_client=client)
     assert socket_client.is_connected()
@@ -50,6 +54,8 @@ def test_send_message_is_idempotent_by_client_msg_id(app):
     first_events = socket_client.get_received()
     second_ack = socket_client.emit('send_message', payload, callback=True)
     second_events = socket_client.get_received()
+    assert isinstance(first_ack, dict)
+    assert isinstance(second_ack, dict)
 
     assert first_ack.get('ok') is True
     assert second_ack.get('ok') is True
@@ -62,7 +68,9 @@ def test_send_message_is_idempotent_by_client_msg_id(app):
 
     messages_resp = client.get(f'/api/rooms/{room_id}/messages')
     assert messages_resp.status_code == 200
-    messages = messages_resp.json.get('messages') or []
+    messages_payload = messages_resp.get_json()
+    assert isinstance(messages_payload, dict)
+    messages = messages_payload.get('messages') or []
     matched = [m for m in messages if str(m.get('client_msg_id') or '') == 'same-client-msg-id']
     assert len(matched) == 1
 

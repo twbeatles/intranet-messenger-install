@@ -12,3 +12,10 @@
 - [CUTOVER_ROLLBACK.md](./CUTOVER_ROLLBACK.md): cutover/rollback plan
 - [BACKUP_CLEANUP_20260223.md](./BACKUP_CLEANUP_20260223.md): cleanup backup record
 - [RELEASE_MSI.md](./RELEASE_MSI.md): MSI release process and checklist
+
+## Repository Verification Baseline
+
+- Python `3.11` recommended (`.github/workflows/ci.yml`, `pyrightconfig.json`)
+- Static analysis: `pyright`
+- Runtime validation: `pytest tests -q`, `python -m compileall app client gui`
+- Encoding/editor defaults: `.editorconfig`, `.vscode/settings.json` (UTF-8)

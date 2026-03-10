@@ -13,7 +13,7 @@ spec 분리 빌드 기반으로 아래 2개 실행파일을 생성합니다.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-pip install pyinstaller
+pip install pyinstaller pyright
 ```
 
 ## 1) 자동 빌드 (권장)
@@ -38,6 +38,10 @@ pyinstaller messenger.spec --noconfirm --clean
 pyinstaller messenger_client.spec --noconfirm --clean
 ```
 
+spec 기준:
+- `messenger.spec`: `server.py` + `app/**` + `gui/**` + `static/`, `templates/`, `i18n/`, `certs/`
+- `messenger_client.spec`: `client/main.py` + `client/**` + `i18n/`
+
 ## 3) 타겟별 준비
 
 서버 패키지 폴더만 갱신:
@@ -61,8 +65,8 @@ pyinstaller messenger_client.spec --noconfirm --clean
   - `build/`, `dist/` 정리 후 `-Clean` 재시도
 - 누락 모듈 오류:
   - 가상환경에서 `pip install -r requirements.txt` 재실행
-  - `messenger.spec`, `messenger_client.spec`는 `collect_submodules("app"|"client")`를 사용하므로
-    신규 하위 모듈(`app/security/*`, `client/services/*`)은 기본적으로 자동 포함됨
+  - `messenger.spec`는 `collect_submodules("app")`, `collect_submodules("gui")`를 사용함
+  - `messenger_client.spec`는 `collect_submodules("client")`를 사용하므로 신규 하위 모듈(`client/services/*`)은 기본적으로 자동 포함됨
 
 ## 5) 다음 단계 (MSI)
 
@@ -72,6 +76,13 @@ pyinstaller messenger_client.spec --noconfirm --clean
 ```
 
 ## 6) 채널/서명 운영 (권장)
+
+빌드 전 최소 검증:
+
+```powershell
+pyright
+pytest tests -q
+```
 
 업데이트 채널(stable/canary) 구성:
 

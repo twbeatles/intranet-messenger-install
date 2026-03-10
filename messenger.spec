@@ -2,6 +2,8 @@
 """
 PyInstaller server spec
 Builds: MessengerServer.exe
+Entry point: server.py
+Bundles: app/**, gui/**, static/, templates/, i18n/, certs/
 
 Usage:
   pyinstaller messenger.spec --noconfirm --clean
@@ -63,6 +65,7 @@ hiddenimports = sorted(
             "keyring.backends",
         ]
         + collect_submodules("app")
+        # Server desktop management window lives under gui/ and uses PyQt6.
         + collect_submodules("gui")
     )
 )

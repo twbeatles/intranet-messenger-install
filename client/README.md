@@ -8,6 +8,8 @@
 python -m client.main --server-url http://127.0.0.1:5000
 ```
 
+권장 개발/검증 기준은 Python `3.11`이며, 정적 분석/에디터 기본값은 루트의 `pyrightconfig.json`, `.editorconfig`, `.vscode/settings.json`을 따릅니다.
+
 ## 주요 구성
 
 - 앱 제어: `client/app_controller.py`
@@ -64,3 +66,12 @@ python -m client.main --server-url http://127.0.0.1:5000
   - (반영) 증분 업데이트 인덱스(`message_id -> row`) 도입
   - (반영) 방 목록 렌더/구독 dedupe + 검색 원격 결과 캐시 적용
   - (잔여) 점진 렌더링 + lazy decrypt 정책 세분화
+
+## 개발 검증
+
+```powershell
+pyright
+pytest tests\test_client_rooms_performance.py tests\test_client_search_debounce.py tests\test_crypto_compat_client.py -q
+```
+
+소스와 문서는 UTF-8로 유지합니다.

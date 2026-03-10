@@ -5,13 +5,19 @@ Desktop client update checker.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from client.services.api_client import APIClient
 
 
 class UpdateChecker:
-    def __init__(self, api_client: APIClient, current_version: str, channel_getter=None, metadata_verifier=None):
+    def __init__(
+        self,
+        api_client: APIClient,
+        current_version: str,
+        channel_getter: Callable[[], str] | None = None,
+        metadata_verifier: Callable[[dict[str, Any]], tuple[bool, str]] | None = None,
+    ):
         self.api_client = api_client
         self.current_version = current_version
         self._channel_getter = channel_getter

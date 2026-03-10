@@ -11,9 +11,12 @@ Default UI language is Korean (`ko-KR`) with English (`en-US`) support.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install pyright
 python server.py --cli
 python -m client.main --server-url http://127.0.0.1:5000
 ```
+
+Python `3.11` is the recommended verification baseline. Static analysis and editor defaults are pinned in `pyrightconfig.json`, `.editorconfig`, and `.vscode/settings.json`, and source/docs should remain UTF-8.
 
 ## Key Features
 
@@ -50,6 +53,7 @@ docs/                ko/en documentation
 ## Tests
 
 ```powershell
+pyright
 pytest tests -q
 python -m compileall app client gui
 ```

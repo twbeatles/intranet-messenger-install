@@ -111,7 +111,9 @@ pnpm-debug.log*
 # ------------------------------------------------------------
 # IDE / OS files
 # ------------------------------------------------------------
-.vscode/
+# Keep only workspace-wide UTF-8/Pylance policy in version control.
+.vscode/*
+!.vscode/settings.json
 .idea/
 .vs/
 .DS_Store

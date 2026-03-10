@@ -9,7 +9,7 @@
 ## 사전 요구사항
 
 - OS: Windows 10/11
-- Python 3.10+
+- Python 3.11 권장 (CI/정적 분석 기준)
 - 의존성 설치: `pip install -r requirements.txt`
 - WiX Toolset v4 (`wix` CLI)
 - 코드서명 인증서(운영 배포 시 필수)
@@ -82,11 +82,15 @@
 ## 운영 체크 명령
 
 ```powershell
+pyright
+```
+
+```powershell
 pytest tests\test_device_sessions_api.py tests\test_client_update_api.py tests\test_crypto_compat_client.py tests\test_upload_contract_desktop.py -q
 ```
 
 ```powershell
-python -m compileall server.py app client
+python -m compileall app client gui
 ```
 
 ## 실패 시 점검 포인트

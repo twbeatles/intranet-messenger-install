@@ -124,6 +124,8 @@ class OutboxStore:
                     (str(server_url or '').rstrip('/'),),
                 )
             else:
+                assert user_id is not None
+                assert server_url is not None
                 conn.execute(
                     'DELETE FROM outbox_messages WHERE user_id = ? AND server_url = ?',
                     (int(user_id), str(server_url or '').rstrip('/')),

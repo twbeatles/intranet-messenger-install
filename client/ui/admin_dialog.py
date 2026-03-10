@@ -102,7 +102,10 @@ class AdminDialog(QDialog):
             return
 
         for idx, member in enumerate(members):
-            uid = int(member.get('id'))
+            uid_value = member.get('id')
+            if uid_value is None:
+                continue
+            uid = int(uid_value)
             marker = (
                 f"[{t('admin.role.admin_short', 'ADMIN')}]"
                 if uid in admin_ids

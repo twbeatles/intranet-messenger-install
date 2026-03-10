@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from client.app_controller import MessengerAppController
 
 
@@ -15,7 +17,7 @@ class _FakeTimer:
 
 def test_search_debounce_coalesces_rapid_input():
     controller = MessengerAppController.__new__(MessengerAppController)
-    controller._search_debounce_timer = _FakeTimer()
+    controller._search_debounce_timer = cast(Any, _FakeTimer())
     controller._pending_search_query = ''
     flushed: list[str] = []
     controller._on_search_requested = lambda query: flushed.append(str(query))
@@ -25,7 +27,8 @@ def test_search_debounce_coalesces_rapid_input():
     controller._on_search_input_changed('hello')
 
     assert controller._pending_search_query == 'hello'
-    assert controller._search_debounce_timer.started_with == [300, 300, 300]
+    timer = cast(_FakeTimer, controller._search_debounce_timer)
+    assert timer.started_with == [300, 300, 300]
 
     controller._flush_search_request()
     assert flushed == ['hello']

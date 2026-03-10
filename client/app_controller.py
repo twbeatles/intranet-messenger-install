@@ -50,7 +50,7 @@ class MessengerAppController(QObject):
         self.update_checker = UpdateChecker(
             self.api,
             self.client_version,
-            channel_getter=lambda: self._settings.value('updates/channel', 'stable', type=str),
+            channel_getter=lambda: str(self._settings.value('updates/channel', 'stable', type=str) or 'stable'),
             metadata_verifier=self._verify_update_metadata,
         )
         self.api.set_unauthorized_retry_hook(self._retry_after_unauthorized)
@@ -474,6 +474,8 @@ class MessengerAppController(QObject):
             self.session_store.clear()
 
         self._restore_pending_sends_from_outbox()
+        if self.current_user is None:
+            raise RuntimeError('authenticated session is missing user payload')
         self.main_window.set_user(self.current_user)
         self._show_main_window()
         self.login_window.hide()
@@ -908,8 +910,11 @@ class MessengerAppController(QObject):
     def _extract_room_id(self, payload: dict[str, Any]) -> int | None:
         value = payload.get('room_id')
         if value is None:
-            poll = payload.get('poll') if isinstance(payload.get('poll'), dict) else {}
+            poll_value = payload.get('poll')
+            poll = poll_value if isinstance(poll_value, dict) else {}
             value = poll.get('room_id')
+        if value is None:
+            return None
         try:
             return int(value)
         except (TypeError, ValueError):
@@ -1421,7 +1426,7 @@ class MessengerAppController(QObject):
             startup_enabled=self.startup_manager.is_enabled(),
             minimize_to_tray=self.main_window.minimize_to_tray,
             language_preference=self.i18n.preference,
-            update_channel=self._settings.value('updates/channel', 'stable', type=str),
+            update_channel=str(self._settings.value('updates/channel', 'stable', type=str) or 'stable'),
         )
         self.settings_dialog.show()
         self.settings_dialog.activateWindow()
@@ -1587,7 +1592,11 @@ class MessengerAppController(QObject):
             return
         try:
             admins = self.api.get_room_admins(room_id)
-            admin_ids = {int(a.get('id')) for a in admins}
+            admin_ids = {
+                int(a.get('id') or 0)
+                for a in admins
+                if int(a.get('id') or 0) > 0
+            }
             self.current_admin_ids = admin_ids
             self.current_is_admin = self.api.is_room_admin(room_id)
 

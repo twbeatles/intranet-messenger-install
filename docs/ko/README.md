@@ -12,3 +12,10 @@
 - [CUTOVER_ROLLBACK.md](./CUTOVER_ROLLBACK.md): 데스크톱 전환/롤백 계획
 - [BACKUP_CLEANUP_20260223.md](./BACKUP_CLEANUP_20260223.md): 정리/백업 기록
 - [RELEASE_MSI.md](./RELEASE_MSI.md): MSI 릴리즈 절차/체크리스트
+
+## 저장소 검증 기준
+
+- Python `3.11` 권장 (`.github/workflows/ci.yml`, `pyrightconfig.json`)
+- 정적 분석: `pyright`
+- 런타임 검증: `pytest tests -q`, `python -m compileall app client gui`
+- 인코딩/에디터 기본값: `.editorconfig`, `.vscode/settings.json` (UTF-8)

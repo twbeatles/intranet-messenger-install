@@ -28,3 +28,10 @@
 - `docs/en/CUTOVER_ROLLBACK.md`
 - `docs/en/BACKUP_CLEANUP_20260223.md`
 - `docs/en/RELEASE_MSI.md`
+
+## Repository Verification Baseline
+
+- Python `3.11` recommended (`.github/workflows/ci.yml`, `pyrightconfig.json`)
+- Static analysis: `pyright`
+- Runtime validation: `pytest tests -q`, `python -m compileall app client gui`
+- Encoding/editor defaults: `.editorconfig`, `.vscode/settings.json` (UTF-8)

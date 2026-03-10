@@ -2,6 +2,8 @@
 """
 PyInstaller client spec
 Builds: MessengerClient.exe
+Entry point: client/main.py
+Bundles: client/**, i18n/
 
 Usage:
   pyinstaller messenger_client.spec --noconfirm --clean

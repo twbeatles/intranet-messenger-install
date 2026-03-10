@@ -5,6 +5,21 @@
 - 핵심 코드: `app/routes.py`, `app/sockets.py`, `app/models/*`, `client/app_controller.py`, `config.py`
 - 최종 검증 실행(배치 반영 후): `python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1` (`174 passed`)
 
+## 정적 분석/인코딩 정합성 배치 적용 결과 (2026-03-10)
+- 상태: 완료
+- 적용 요약:
+  - `pyrightconfig.json` 추가: Python `3.11`, `typeCheckingMode: standard`, 활성 코드 경로만 포함, `messenger_server.py` 제외
+  - `.editorconfig`, `.vscode/settings.json` 추가/추적: UTF-8 및 워크스페이스 Pylance 기준 고정
+  - `.github/workflows/ci.yml`에 `pyright` 단계 추가
+  - 서버/클라이언트의 Pylance nullable/type narrowing 이슈 정리 및 PySide6 enum namespacing 정리
+  - 활성 소스의 손상된 이중 물음표 플레이스홀더 주석/문자열 복구
+  - 루트 README, 빌드/릴리즈/세션 가이드, spec 설명을 현재 검증 기준과 동기화
+- 최종 검증:
+  - `pyright` 통과 (`0 errors`)
+  - `pytest tests -q` 통과 (`174 passed`)
+  - UTF-8 디코드 실패 파일 `0`
+  - 활성 소스 이중 물음표 플레이스홀더 스캔 결과 `0`
+
 ## 단일 배치 적용 결과 (2026-03-05)
 - 상태: 완료
 - 적용 요약:

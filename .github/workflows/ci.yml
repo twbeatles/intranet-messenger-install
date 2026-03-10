@@ -28,12 +28,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest
+          pip install pyright pytest
 
       - name: Static Compile Check
         shell: pwsh
         run: |
           python -m compileall app client gui
+
+      - name: Run Pyright
+        shell: pwsh
+        run: |
+          pyright
 
       - name: Run Tests
         shell: pwsh

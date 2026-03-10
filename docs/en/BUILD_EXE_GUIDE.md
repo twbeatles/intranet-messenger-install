@@ -15,7 +15,7 @@ Build these two binaries from separated PyInstaller specs:
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-pip install pyinstaller
+pip install pyinstaller pyright
 ```
 
 ## 1) Automatic Build (Recommended)
@@ -38,6 +38,10 @@ Main outputs:
 pyinstaller messenger.spec --noconfirm --clean
 pyinstaller messenger_client.spec --noconfirm --clean
 ```
+
+Spec scope:
+- `messenger.spec`: `server.py` + `app/**` + `gui/**` + `static/`, `templates/`, `i18n/`, `certs/`
+- `messenger_client.spec`: `client/main.py` + `client/**` + `i18n/`
 
 ## 3) Per-target Build
 
@@ -62,8 +66,8 @@ Client only:
   - clean `build/`, `dist/` and retry with `-Clean`
 - missing module error:
   - run `pip install -r requirements.txt` again inside venv
-  - `messenger.spec` and `messenger_client.spec` use `collect_submodules("app"|"client")`,
-    so new submodules (`app/security/*`, `client/services/*`) are included by default
+  - `messenger.spec` uses `collect_submodules("app")` and `collect_submodules("gui")`
+  - `messenger_client.spec` uses `collect_submodules("client")`, so new client submodules are included by default
 
 ## 5) Next Step (MSI)
 
@@ -73,6 +77,13 @@ Client only:
 ```
 
 ## 6) Channel/Signing Operations (Recommended)
+
+Minimum validation before packaging:
+
+```powershell
+pyright
+pytest tests -q
+```
 
 Configure update channels (stable/canary):
 

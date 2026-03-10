@@ -1,0 +1,24 @@
+{
+  "typeCheckingMode": "standard",
+  "pythonVersion": "3.11",
+  "include": [
+    "server.py",
+    "config.py",
+    "app",
+    "client",
+    "gui",
+    "tests"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "build",
+    "dist",
+    "flask_session",
+    "messenger_server.py",
+    "uploads"
+  ],
+  "reportMissingTypeStubs": false
+}

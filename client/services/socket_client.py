@@ -21,69 +21,31 @@ class SocketClient:
         self._register_internal_handlers()
 
     def _register_internal_handlers(self) -> None:
-        @self._client.on('connect')
-        def _on_connect():
-            self._emit_local('connect', {})
+        self._client.on('connect', handler=self._on_connect)
+        self._client.on('disconnect', handler=self._on_disconnect)
+        self._client.on('new_message', handler=lambda data=None: self._emit_event('new_message', data))
+        self._client.on('read_updated', handler=lambda data=None: self._emit_event('read_updated', data))
+        self._client.on('user_typing', handler=lambda data=None: self._emit_event('user_typing', data))
+        self._client.on('room_updated', handler=lambda data=None: self._emit_event('room_updated', data))
+        self._client.on('room_name_updated', handler=lambda data=None: self._emit_event('room_name_updated', data))
+        self._client.on('room_members_updated', handler=lambda data=None: self._emit_event('room_members_updated', data))
+        self._client.on('message_deleted', handler=lambda data=None: self._emit_event('message_deleted', data))
+        self._client.on('message_edited', handler=lambda data=None: self._emit_event('message_edited', data))
+        self._client.on('reaction_updated', handler=lambda data=None: self._emit_event('reaction_updated', data))
+        self._client.on('poll_updated', handler=lambda data=None: self._emit_event('poll_updated', data))
+        self._client.on('poll_created', handler=lambda data=None: self._emit_event('poll_created', data))
+        self._client.on('pin_updated', handler=lambda data=None: self._emit_event('pin_updated', data))
+        self._client.on('admin_updated', handler=lambda data=None: self._emit_event('admin_updated', data))
+        self._client.on('error', handler=lambda data=None: self._emit_event('error', data))
 
-        @self._client.on('disconnect')
-        def _on_disconnect():
-            self._emit_local('disconnect', {})
+    def _on_connect(self, _data: Any = None) -> None:
+        self._emit_local('connect', {})
 
-        @self._client.on('new_message')
-        def _on_new_message(data):
-            self._emit_local('new_message', data or {})
+    def _on_disconnect(self, _data: Any = None) -> None:
+        self._emit_local('disconnect', {})
 
-        @self._client.on('read_updated')
-        def _on_read_updated(data):
-            self._emit_local('read_updated', data or {})
-
-        @self._client.on('user_typing')
-        def _on_user_typing(data):
-            self._emit_local('user_typing', data or {})
-
-        @self._client.on('room_updated')
-        def _on_room_updated(data):
-            self._emit_local('room_updated', data or {})
-
-        @self._client.on('room_name_updated')
-        def _on_room_name_updated(data):
-            self._emit_local('room_name_updated', data or {})
-
-        @self._client.on('room_members_updated')
-        def _on_room_members_updated(data):
-            self._emit_local('room_members_updated', data or {})
-
-        @self._client.on('message_deleted')
-        def _on_message_deleted(data):
-            self._emit_local('message_deleted', data or {})
-
-        @self._client.on('message_edited')
-        def _on_message_edited(data):
-            self._emit_local('message_edited', data or {})
-
-        @self._client.on('reaction_updated')
-        def _on_reaction_updated(data):
-            self._emit_local('reaction_updated', data or {})
-
-        @self._client.on('poll_updated')
-        def _on_poll_updated(data):
-            self._emit_local('poll_updated', data or {})
-
-        @self._client.on('poll_created')
-        def _on_poll_created(data):
-            self._emit_local('poll_created', data or {})
-
-        @self._client.on('pin_updated')
-        def _on_pin_updated(data):
-            self._emit_local('pin_updated', data or {})
-
-        @self._client.on('admin_updated')
-        def _on_admin_updated(data):
-            self._emit_local('admin_updated', data or {})
-
-        @self._client.on('error')
-        def _on_error(data):
-            self._emit_local('error', data or {})
+    def _emit_event(self, event: str, data: Any) -> None:
+        self._emit_local(event, data if isinstance(data, dict) else {})
 
     def _emit_local(self, event: str, payload: dict[str, Any]) -> None:
         for callback in self._handlers.get(event, []):

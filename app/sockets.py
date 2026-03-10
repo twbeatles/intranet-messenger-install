@@ -7,6 +7,7 @@ import logging
 import time
 import traceback
 from threading import Lock
+from typing import Any, cast
 from flask import session, request, current_app
 from flask_socketio import emit, join_room, leave_room
 
@@ -44,6 +45,26 @@ CACHE_TTL = 300  # [v4.1] 캐시 유효 시간 (5분)
 typing_last_emit = {}  # {(user_id, room_id): timestamp}
 typing_rate_lock = Lock()
 TYPING_RATE_LIMIT = 1.0  # 최소 1초 간격
+
+
+def _request_sid() -> str | None:
+    sid = getattr(cast(Any, request), 'sid', None)
+    return sid if isinstance(sid, str) and sid else None
+
+
+def _socket_emit(
+    event: str,
+    payload: dict[str, Any],
+    *,
+    room: str | None = None,
+    include_self: bool | None = None,
+) -> None:
+    kwargs: dict[str, Any] = {}
+    if room is not None:
+        kwargs['room'] = room
+    if include_self is not None:
+        kwargs['include_self'] = include_self
+    cast(Any, emit)(event, payload, **kwargs)
 
 
 def _emit_error_i18n(message_ko: str, *, code: str | None = None, key: str | None = None) -> None:
@@ -220,15 +241,18 @@ def register_socket_events(socketio):
             return False
 
         user_id = session['user_id']
+        sid = _request_sid()
+        if sid is None:
+            return False
         current_token = get_user_session_token(user_id)
         if current_token and session.get('session_token') != current_token:
             return False
 
         with online_users_lock:
-            online_users[request.sid] = user_id
+            online_users[sid] = user_id
             if user_id not in user_sids:
                 user_sids[user_id] = []
-            user_sids[user_id].append(request.sid)
+            user_sids[user_id].append(sid)
             was_offline = len(user_sids[user_id]) == 1
 
         # Personal channel for direct user-targeted events.
@@ -250,8 +274,7 @@ def register_socket_events(socketio):
             update_user_status(user_id, 'online')
             # 해당 사용자의 방에만 상태 전송 (broadcast 대신)
             for room_id in room_ids:
-                emit('user_status', {'user_id': user_id, 'status': 'online'},
-                     room=f'room_{room_id}')
+                _socket_emit('user_status', {'user_id': user_id, 'status': 'online'}, room=f'room_{room_id}')
 
         with stats_lock:
             server_stats['total_connections'] += 1
@@ -267,12 +290,15 @@ def register_socket_events(socketio):
         user_id = None
         still_online = False
         room_ids = []  # [v4.2] 락 내에서 미리 저장
+        sid = _request_sid()
+        if sid is None:
+            return
         
         with online_users_lock:
-            user_id = online_users.pop(request.sid, None)
+            user_id = online_users.pop(sid, None)
             if user_id and user_id in user_sids:
-                if request.sid in user_sids[user_id]:
-                    user_sids[user_id].remove(request.sid)
+                if sid in user_sids[user_id]:
+                    user_sids[user_id].remove(sid)
                 still_online = len(user_sids[user_id]) > 0
                 if not still_online:
                     del user_sids[user_id]
@@ -288,8 +314,7 @@ def register_socket_events(socketio):
                 room_ids = get_user_room_ids(user_id)
             try:
                 for room_id in room_ids:
-                    emit('user_status', {'user_id': user_id, 'status': 'offline'}, 
-                         room=f'room_{room_id}')
+                    _socket_emit('user_status', {'user_id': user_id, 'status': 'offline'}, room=f'room_{room_id}')
             except Exception as e:
                 logger.error(f"Disconnect broadcast error: {e}")
             
@@ -439,6 +464,9 @@ def register_socket_events(socketio):
 
             if message_type in ('file', 'image'):
                 token = data.get('upload_token')
+                if not isinstance(token, str) or not token:
+                    _emit_error_i18n('업로드 토큰이 필요합니다.')
+                    return {'ok': False, 'error': '업로드 토큰이 필요합니다.'}
                 reason = get_upload_token_failure_reason(
                     token=token,
                     user_id=session['user_id'],
@@ -509,7 +537,7 @@ def register_socket_events(socketio):
                 # Keep field for compatibility while avoiding per-message COUNT query.
                 message['unread_count'] = 0
 
-                emit('new_message', message, room=f'room_{room_id}')
+                _socket_emit('new_message', message, room=f'room_{room_id}')
                 # broadcast 대신 해당 방 멤버들의 모든 세션에 전송
                 logger.debug(f"Message sent: room={room_id}, user={session['user_id']}, type={message_type}")
                 return {'ok': True, 'message_id': message_id}
@@ -550,7 +578,7 @@ def register_socket_events(socketio):
                 return
 
             update_last_read(normalized_room_id, session['user_id'], normalized_message_id)
-            emit('read_updated', {
+            _socket_emit('read_updated', {
                 'room_id': normalized_room_id,
                 'user_id': session['user_id'],
                 'message_id': normalized_message_id
@@ -601,7 +629,7 @@ def register_socket_events(socketio):
                 user = get_user_by_id(user_id)
                 nickname = user.get('nickname', '사용자') if user else '사용자'
             
-            emit('user_typing', {
+            _socket_emit('user_typing', {
                 'room_id': room_id,
                 'user_id': user_id,
                 'nickname': nickname,
@@ -672,7 +700,7 @@ def register_socket_events(socketio):
             
             success, error_msg, room_id = edit_message(message_id, session['user_id'], content)
             if success:
-                emit('message_edited', {
+                _socket_emit('message_edited', {
                     'room_id': room_id,
                     'message_id': message_id,
                     'content': content,
@@ -700,7 +728,7 @@ def register_socket_events(socketio):
             success, result = delete_message(message_id, session['user_id'])
             if success:
                 room_id = result
-                emit('message_deleted', {
+                _socket_emit('message_deleted', {
                     'room_id': room_id,
                     'message_id': message_id
                 }, room=f'room_{room_id}')
@@ -739,7 +767,7 @@ def register_socket_events(socketio):
 
             reactions = get_message_reactions(int(message_id))
             
-            emit('reaction_updated', {
+            _socket_emit('reaction_updated', {
                 'room_id': room_id,
                 'message_id': message_id,
                 'reactions': reactions
@@ -771,7 +799,7 @@ def register_socket_events(socketio):
                 _emit_error_i18n('잘못된 요청입니다.')
                 return
             
-            emit('poll_updated', {
+            _socket_emit('poll_updated', {
                 'room_id': room_id,
                 'poll': poll
             }, room=f'room_{room_id}')
@@ -802,7 +830,7 @@ def register_socket_events(socketio):
                 _emit_error_i18n('잘못된 요청입니다.')
                 return
             
-            emit('poll_created', {
+            _socket_emit('poll_created', {
                 'room_id': room_id,
                 'poll': poll
             }, room=f'room_{room_id}')
@@ -827,11 +855,11 @@ def register_socket_events(socketio):
                 sys_msg = create_message(room_id, session['user_id'], content, 'system')
                 
                 if sys_msg:
-                    emit('new_message', sys_msg, room=f'room_{room_id}')
+                    _socket_emit('new_message', sys_msg, room=f'room_{room_id}')
 
                 pins = get_pinned_messages(int(room_id))
                 
-                emit('pin_updated', {
+                _socket_emit('pin_updated', {
                     'room_id': room_id,
                     'pins': pins
                 }, room=f'room_{room_id}')
@@ -851,8 +879,12 @@ def register_socket_events(socketio):
                     _emit_error_i18n('관리자만 권한을 변경할 수 있습니다.')
                     return
                 admins = get_room_admins(int(room_id))
-                admin_ids = {int(a.get('id')) for a in admins}
-                emit('admin_updated', {
+                admin_ids = {
+                    int(a.get('id') or 0)
+                    for a in admins
+                    if int(a.get('id') or 0) > 0
+                }
+                _socket_emit('admin_updated', {
                     'room_id': room_id,
                     'user_id': target_user_id,
                     'is_admin': int(target_user_id) in admin_ids

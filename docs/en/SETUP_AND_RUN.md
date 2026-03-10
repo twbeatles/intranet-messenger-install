@@ -6,7 +6,7 @@
 
 - Client: Windows 10/11
 - Server: Windows-first (Linux also possible with Python runtime)
-- Python: 3.10+
+- Python: 3.11 recommended (CI/static-analysis baseline)
 
 ## 1) Development Environment
 
@@ -14,6 +14,7 @@
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install pyright
 ```
 
 ## 2) Run Server
@@ -84,6 +85,12 @@ Server MSI:
 
 ## 7) Tests
 
+Static analysis:
+
+```powershell
+pyright
+```
+
 All tests:
 
 ```powershell
@@ -106,3 +113,4 @@ Verify these values in `config.py`:
 - `USE_HTTPS`
 
 Apply backup policy to `messenger.db`, `uploads/`, `.secret_key`, `.security_salt`.
+Keep source/docs in UTF-8; workspace defaults are pinned in `.editorconfig` and `.vscode/settings.json`.

@@ -1,7 +1,7 @@
 # GEMINI.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-03-05
+최종 업데이트: 2026-03-10
 
 ## 1) 이 문서의 역할
 
@@ -33,8 +33,12 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
   - 카탈로그: `i18n/ko/*`, `i18n/en/*`
   - API 에러 호환: `error` 유지 + `error_code`, `error_localized`, `locale` 추가
 - 테스트 기준:
+  - `pyright` -> `0 errors`
   - `pytest tests -q` -> `174 passed`
   - `pytest --maxfail=1` -> `174 passed`
+- 정적 분석/에디터 기준:
+  - `pyrightconfig.json` (`typeCheckingMode: standard`, Python `3.11`)
+  - `.editorconfig`, `.vscode/settings.json` (UTF-8 / workspace Pylance baseline)
 - 배포 기준:
   - 서버 EXE: `messenger.spec`
   - 클라이언트 EXE: `messenger_client.spec`
@@ -74,6 +78,7 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 2. 영향 파일 목록 확정
 3. 최소 범위 수정(기능 계약 우선)
 4. 아래 검증을 순서대로 실행:
+   - `pyright`
    - `python -m compileall app client gui`
    - `pytest tests -q`
    - `pytest --maxfail=1`
@@ -115,6 +120,6 @@ Before editing, provide:
 2) non-negotiable contracts in this scope,
 3) exact files to modify.
 Then implement and verify with:
-`python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1`.
+`pyright`, `python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1`.
 Finally report changed files and residual risks.
 ```

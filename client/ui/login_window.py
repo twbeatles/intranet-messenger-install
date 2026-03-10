@@ -44,15 +44,15 @@ class LoginWindow(QDialog):
         # 타이틀부
         title_box = QVBoxLayout()
         title_box.setSpacing(6)
-        title_box.setAlignment(Qt.AlignCenter)
+        title_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title = QLabel('')
         title.setProperty('title', True)
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         subtitle = QLabel('')
         subtitle.setProperty('subtitle', True)
-        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
@@ -79,8 +79,8 @@ class LoginWindow(QDialog):
 
         # Form
         form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        form.setFormAlignment(Qt.AlignTop)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        form.setFormAlignment(Qt.AlignmentFlag.AlignTop)
         form.setHorizontalSpacing(16)
         form.setVerticalSpacing(16)
 
@@ -93,14 +93,17 @@ class LoginWindow(QDialog):
         form.addRow(self.username_label, self.username_input)
 
         self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_label = QLabel('')
 
         # 비밀번호 표시/숨기기 토글 액션
-        self._toggle_pw_action = self.password_input.addAction(
+        toggle_action = self.password_input.addAction(
             QAction("👁", self.password_input),
             QLineEdit.ActionPosition.TrailingPosition,
         )
+        if toggle_action is None:
+            raise RuntimeError('password visibility action could not be created')
+        self._toggle_pw_action = toggle_action
         self._toggle_pw_action.triggered.connect(self._toggle_password_visibility)
         form.addRow(self.password_label, self.password_input)
 
@@ -139,14 +142,14 @@ class LoginWindow(QDialog):
         help_text = QLabel('')
         help_text.setWordWrap(True)
         help_text.setProperty('muted', True)
-        help_text.setAlignment(Qt.AlignCenter)
+        help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(help_text)
         self._help_label = help_text
 
         # Status label — 에러/진행 상태 시각화
         self.status_label = QLabel('')
         self.status_label.setProperty('muted', True)
-        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setMinimumHeight(24)
         self.status_label.setWordWrap(True)
         root.addWidget(self.status_label)
@@ -160,10 +163,10 @@ class LoginWindow(QDialog):
     def _toggle_password_visibility(self) -> None:
         self._password_visible = not self._password_visible
         if self._password_visible:
-            self.password_input.setEchoMode(QLineEdit.Normal)
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
             self._toggle_pw_action.setText("🔒")
         else:
-            self.password_input.setEchoMode(QLineEdit.Password)
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
             self._toggle_pw_action.setText("👁")
 
     def set_server_url(self, server_url: str) -> None:
@@ -188,7 +191,7 @@ class LoginWindow(QDialog):
             self.status_label.setProperty('status', '')
         self.status_label.style().unpolish(self.status_label)
         self.status_label.style().polish(self.status_label)
-        self.setCursor(Qt.WaitCursor if busy else Qt.ArrowCursor)
+        self.setCursor(Qt.CursorShape.WaitCursor if busy else Qt.CursorShape.ArrowCursor)
 
     def _read_common(self) -> tuple[str, str, str]:
         server_url = self.server_url_input.text().strip().rstrip('/')

@@ -45,7 +45,9 @@ def test_profile_image_upload_rolls_back_new_file_on_db_failure(app, monkeypatch
     _register(client, 'profile_atomic_user')
     _login(client, 'profile_atomic_user')
 
-    me = client.get('/api/me').json['user']
+    me_payload = client.get('/api/me').get_json()
+    assert isinstance(me_payload, dict)
+    me = me_payload['user']
     user_id = int(me['id'])
 
     old_rel_path = 'profiles/old_profile.png'
@@ -55,7 +57,9 @@ def test_profile_image_upload_rolls_back_new_file_on_db_failure(app, monkeypatch
 
     with app.app_context():
         assert update_user_profile(user_id, profile_image=old_rel_path)
-        assert str(get_user_by_id(user_id).get('profile_image') or '') == old_rel_path
+        user = get_user_by_id(user_id)
+        assert user is not None
+        assert str(user.get('profile_image') or '') == old_rel_path
 
     monkeypatch.setattr(routes, 'update_user_profile', lambda *_args, **_kwargs: False)
 
@@ -72,7 +76,9 @@ def test_profile_image_upload_rolls_back_new_file_on_db_failure(app, monkeypatch
     assert files == ['old_profile.png']
 
     with app.app_context():
-        assert str(get_user_by_id(user_id).get('profile_image') or '') == old_rel_path
+        user = get_user_by_id(user_id)
+        assert user is not None
+        assert str(user.get('profile_image') or '') == old_rel_path
 
 
 def test_cleanup_orphan_profile_files_keeps_tracked_profile_image(app):
@@ -84,7 +90,9 @@ def test_cleanup_orphan_profile_files_keeps_tracked_profile_image(app):
     _register(client, 'profile_cleanup_user')
     _login(client, 'profile_cleanup_user')
 
-    me = client.get('/api/me').json['user']
+    me_payload = client.get('/api/me').get_json()
+    assert isinstance(me_payload, dict)
+    me = me_payload['user']
     user_id = int(me['id'])
 
     tracked_rel = 'profiles/tracked_profile.png'
@@ -96,7 +104,9 @@ def test_cleanup_orphan_profile_files_keeps_tracked_profile_image(app):
 
     with app.app_context():
         assert update_user_profile(user_id, profile_image=tracked_rel)
-        assert str(get_user_by_id(user_id).get('profile_image') or '') == tracked_rel
+        user = get_user_by_id(user_id)
+        assert user is not None
+        assert str(user.get('profile_image') or '') == tracked_rel
 
     removed = upload_tokens.cleanup_orphan_profile_files(grace_seconds=0)
     assert removed >= 1

@@ -11,9 +11,12 @@ English README: `README.en.md`
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install pyright
 python server.py --cli
 python -m client.main --server-url http://127.0.0.1:5000
 ```
+
+권장 검증 기준은 Python `3.11`입니다. 저장소의 정적 분석/에디터 기준은 `pyrightconfig.json`, `.editorconfig`, `.vscode/settings.json`에 고정되어 있으며, 소스/문서는 UTF-8로 유지합니다.
 
 ## 핵심 기능
 
@@ -50,6 +53,7 @@ docs/                ko/en documentation
 ## 테스트
 
 ```powershell
+pyright
 pytest tests -q
 python -m compileall app client gui
 ```
