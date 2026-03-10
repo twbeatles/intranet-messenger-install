@@ -4,6 +4,7 @@
 Flask 앱 팩토리 패턴
 """
 
+import importlib
 import os
 import sys
 import logging
@@ -327,8 +328,9 @@ def create_app():
     
     if _async_mode is None and ASYNC_MODE == 'eventlet':
         try:
-            import eventlet  # noqa: F401
-            eventlet.monkey_patch()
+            monkey_patch = getattr(importlib.import_module('eventlet'), 'monkey_patch', None)
+            if callable(monkey_patch):
+                monkey_patch()
             _async_mode = 'eventlet'
             logger.info("eventlet 비동기 모드 활성화")
         except ImportError:

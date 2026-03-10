@@ -17,7 +17,9 @@
     "build",
     "dist",
     "flask_session",
+    "hook-engineio.py",
     "messenger_server.py",
+    "tests/hook-engineio.py",
     "uploads"
   ],
   "reportMissingTypeStubs": false
