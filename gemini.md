@@ -1,7 +1,7 @@
 # GEMINI.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-03-10
+최종 업데이트: 2026-03-18
 
 ## 1) 이 문서의 역할
 
@@ -16,13 +16,16 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 5. `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
 6. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
 7. 작업 대상 코드 파일
+   - 서버: `app/__init__.py`, `app/routes.py`, `app/sockets.py`, `app/bootstrap/*`, `app/http/*`, `app/realtime/*`
+   - 클라이언트: `client/app_controller.py`, `client/controllers/*`, `client/ui/*`, `client/services/*`
+   - 배포: `messenger.spec`, `messenger_client.spec`, `scripts/build_msi.ps1`
 
 ### 리스크 수용 메모 (R1)
 
 - 현재 저장소에서는 `IMPLEMENTATION_RISK_AUDIT_20260224.md`, `IMPLEMENTATION_RISK_AUDIT_20260225.md`가 삭제 상태일 수 있음.
 - 본 세션 기준 정책: **복구하지 않고 삭제 상태를 유지**하며, 대체 기준 문서로 `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`를 사용.
 
-## 3) 프로젝트 스냅샷 (2026-03-05 기준)
+## 3) 프로젝트 스냅샷 (2026-03-18 기준)
 
 - 제품: 사내 메신저 Desktop-First 전환
 - 서버: `Flask + Socket.IO + SQLite`
@@ -34,8 +37,9 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
   - API 에러 호환: `error` 유지 + `error_code`, `error_localized`, `locale` 추가
 - 테스트 기준:
   - `pyright` -> `0 errors`
-  - `pytest tests -q` -> `174 passed`
-  - `pytest --maxfail=1` -> `174 passed`
+  - `python -m compileall app client gui` -> 성공
+  - `pytest --collect-only -q` -> `177 tests collected`
+  - `pytest tests -q` -> `177 passed`
 - 정적 분석/에디터 기준:
   - `pyrightconfig.json` (`typeCheckingMode: standard`, Python `3.11`)
   - `.editorconfig`, `.vscode/settings.json` (UTF-8 / workspace Pylance baseline)
@@ -43,6 +47,13 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
   - 서버 EXE: `messenger.spec`
   - 클라이언트 EXE: `messenger_client.spec`
   - MSI: `scripts/build_msi.ps1`, `packaging/wix/*`
+- 구조 분할 기준:
+  - `app/routes.py`, `app/sockets.py`, `client/app_controller.py`, `static/css/style.css`는 공개 호환 진입점 유지
+  - 실제 서버 구현은 `app/bootstrap/*`, `app/http/*`, `app/realtime/*`로 분리
+  - 클라이언트 협력 로직은 `client/controllers/*`로 분리
+  - `client/ui/main_window.py`는 shell 유지, 렌더 헬퍼는 `client/ui/*` helper 모듈로 분리
+  - `gui/server_window.py`는 shell 유지, 프로세스/트레이/설정/토스트는 `gui/*` helper로 분리
+  - 웹 엔트리는 `templates/index.html` -> `static/js/modules/main.js` 단일 module 로더 + `static/css/style.css` manifest
 
 ## 4) 반드시 지켜야 할 규칙
 

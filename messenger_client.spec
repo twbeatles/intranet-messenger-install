@@ -3,7 +3,7 @@
 PyInstaller client spec
 Builds: MessengerClient.exe
 Entry point: client/main.py
-Bundles: client/**, i18n/
+Bundles: client/** (including client/controllers and extracted client/ui helpers), i18n/
 
 Usage:
   pyinstaller messenger_client.spec --noconfirm --clean
@@ -53,6 +53,7 @@ hiddenimports = sorted(
             "Crypto.Util.Padding",
             "PySide6",
         ]
+        # Split client controllers/UI helpers are pulled in automatically.
         + collect_submodules("client")
     )
 )

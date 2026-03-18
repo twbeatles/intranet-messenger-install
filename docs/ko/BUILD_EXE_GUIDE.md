@@ -44,6 +44,11 @@ spec 기준:
 - `messenger.spec`: `server.py` + `app/**` + `gui/**` + `static/`, `templates/`, `i18n/`, `certs/`
 - `messenger_client.spec`: `client/main.py` + `client/**` + `i18n/`
 
+현재 분할 구조 기준 포함 범위:
+- 서버 spec는 `collect_submodules("app")`, `collect_submodules("gui")`를 사용하므로 `app/bootstrap/*`, `app/http/*`, `app/realtime/*`, `gui/server_process.py` 등 분리된 하위 모듈을 자동 포함합니다.
+- 서버 spec의 `static/` 데이터 포함 범위에는 `static/css/style.css` manifest, 분할 CSS 파일, `static/js/modules/main.js` 브리지 엔트리가 모두 포함됩니다.
+- 클라이언트 spec는 `collect_submodules("client")`를 사용하므로 `client/controllers/*`와 `client/ui/*` helper 모듈도 자동 포함됩니다.
+
 ## 3) 타겟별 준비
 
 서버 패키지 폴더만 갱신:
@@ -68,7 +73,7 @@ spec 기준:
 - 누락 모듈 오류:
   - 가상환경에서 `pip install -r requirements.txt` 재실행
   - `messenger.spec`는 `collect_submodules("app")`, `collect_submodules("gui")`를 사용함
-  - `messenger_client.spec`는 `collect_submodules("client")`를 사용하므로 신규 하위 모듈(`client/services/*`)은 기본적으로 자동 포함됨
+  - `messenger_client.spec`는 `collect_submodules("client")`를 사용하므로 신규 하위 모듈(`client/controllers/*`, `client/services/*`, `client/ui/*`)은 기본적으로 자동 포함됨
 
 ## 5) 다음 단계 (MSI)
 

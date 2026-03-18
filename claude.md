@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-03-10
+최종 업데이트: 2026-03-18
 
 ## 1) 목적
 
@@ -16,8 +16,8 @@
 5. `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
 6. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
 7. 관련 구현 파일(작업 범위별):
-   - 서버: `app/routes.py`, `app/sockets.py`, `app/models/*`
-   - 클라이언트: `client/app_controller.py`, `client/ui/*`, `client/services/*`
+   - 서버: `app/__init__.py`, `app/routes.py`, `app/sockets.py`, `app/bootstrap/*`, `app/http/*`, `app/realtime/*`, `app/models/*`
+   - 클라이언트: `client/app_controller.py`, `client/controllers/*`, `client/ui/*`, `client/services/*`
    - 배포: `messenger.spec`, `messenger_client.spec`, `scripts/build_msi.ps1`
 
 ### 리스크 수용 메모 (R1)
@@ -35,6 +35,11 @@
 - 최신 검증(2026-03-10):
   - `pyright` -> `0 errors`
   - `pytest tests -q` -> `174 passed`
+- 최신 검증(2026-03-18):
+  - `pyright` -> `0 errors`
+  - `python -m compileall app client gui` -> 성공
+  - `pytest --collect-only -q` -> `177 tests collected`
+  - `pytest tests -q` -> `177 passed`
 - 정적 분석/에디터 기준:
   - `pyrightconfig.json` (`typeCheckingMode: standard`, Python `3.11`)
   - `.editorconfig`, `.vscode/settings.json` (UTF-8 / workspace Pylance baseline)
@@ -47,10 +52,21 @@
   - `client/ui/theme.py`
   - `client/ui/login_window.py`
   - `client/ui/main_window.py`
+  - `client/ui/main_window_sections.py`
+  - `client/ui/message_list.py`
+  - `client/ui/room_list.py`
+  - `client/ui/message_formatters.py`
   - `client/ui/settings_dialog.py`
   - `client/ui/polls_dialog.py`
   - `client/ui/files_dialog.py`
   - `client/ui/admin_dialog.py`
+- 구조 분할 기준선:
+  - 서버 공개 엔트리(`app/routes.py`, `app/sockets.py`)는 shim 유지
+  - 실제 서버 구현은 `app/bootstrap/*`, `app/http/*`, `app/realtime/*`로 분할
+  - `client/app_controller.py`는 facade 유지, 세부 협력은 `client/controllers/*`로 이동
+  - `gui/server_window.py`는 shell 유지, 프로세스/트레이/설정/토스트는 `gui/*` helper로 이동
+  - `static/css/style.css`는 manifest 유지, 실제 규칙은 분할 CSS 파일에서 import
+  - `templates/index.html`은 `static/js/modules/main.js` 단일 module 엔트리만 로드
 
 ## 4) 핵심 계약 (절대 깨지면 안 됨)
 

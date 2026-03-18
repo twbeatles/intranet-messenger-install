@@ -3,7 +3,9 @@
 PyInstaller server spec
 Builds: MessengerServer.exe
 Entry point: server.py
-Bundles: app/**, gui/**, static/, templates/, i18n/, certs/
+Bundles: app/** (including app/bootstrap, app/http, app/realtime),
+         gui/**, static/ (including CSS manifest/fragments + JS module bridge),
+         templates/, i18n/, certs/
 
 Usage:
   pyinstaller messenger.spec --noconfirm --clean
@@ -64,6 +66,7 @@ hiddenimports = sorted(
             "keyring",
             "keyring.backends",
         ]
+        # Split server packages are pulled in automatically.
         + collect_submodules("app")
         # Server desktop management window lives under gui/ and uses PyQt6.
         + collect_submodules("gui")

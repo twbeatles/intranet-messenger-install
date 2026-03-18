@@ -56,7 +56,10 @@ wix --version
 
 spec 정합성 메모:
 - `messenger.spec`는 `server.py` 엔트리와 `app/**`, `gui/**`, `static/`, `templates/`, `i18n/`, `certs/`를 포함합니다.
+  - `collect_submodules("app")`, `collect_submodules("gui")`를 사용하므로 `app/bootstrap/*`, `app/http/*`, `app/realtime/*`, `gui/server_process.py` 같은 분할 모듈도 자동 포함됩니다.
+  - `static/` 전체를 데이터로 포함하므로 `static/css/style.css` manifest, 분할 CSS, `static/js/modules/main.js` 브리지 엔트리도 함께 패키징됩니다.
 - `messenger_client.spec`는 `client/main.py` 엔트리와 `client/**`, `i18n/`를 포함합니다.
+  - `collect_submodules("client")`를 사용하므로 `client/controllers/*`, `client/ui/*` helper 모듈도 자동 포함됩니다.
 
 ## 4) MSI 빌드
 

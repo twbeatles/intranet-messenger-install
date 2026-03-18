@@ -12,10 +12,21 @@ python -m client.main --server-url http://127.0.0.1:5000
 
 ## 주요 구성
 
-- 앱 제어: `client/app_controller.py`
+- 앱 제어(facade): `client/app_controller.py`
+- 조정 계층:
+  - `client/controllers/session_coordinator.py`
+  - `client/controllers/rooms_coordinator.py`
+  - `client/controllers/message_dispatcher.py`
+  - `client/controllers/socket_router.py`
+  - `client/controllers/dialogs_controller.py`
+  - `client/controllers/update_policy.py`
 - UI:
   - `client/ui/login_window.py`
   - `client/ui/main_window.py`
+  - `client/ui/main_window_sections.py`
+  - `client/ui/message_list.py`
+  - `client/ui/room_list.py`
+  - `client/ui/message_formatters.py`
   - `client/ui/settings_dialog.py`
   - `client/ui/polls_dialog.py`
   - `client/ui/files_dialog.py`
@@ -29,6 +40,11 @@ python -m client.main --server-url http://127.0.0.1:5000
   - `client/services/tray_manager.py` (트레이/알림)
   - `client/services/update_checker.py` (`/api/client/update` 연동)
 
+현재 구조 원칙:
+- `client/app_controller.py`는 공개 진입점/호환 facade 역할을 유지
+- coordinator가 서비스/소켓/UI 사이 협력을 조정하고, 직접적인 책임 분리를 담당
+- `client/ui/main_window.py`는 signal surface와 윈도우 shell 역할을 유지하고, 렌더링 세부 구현은 helper 모듈로 분리
+
 ## 현재 구현 범위
 
 - 인증:
@@ -38,7 +54,7 @@ python -m client.main --server-url http://127.0.0.1:5000
 - 대화:
   - 방 목록 조회, 방 입장, 메시지 조회
   - 텍스트 메시지 송신(필요 시 E2E 암호화)
-  - 새 메시지 수신/읽음 이벤트 처리(기본)
+  - 새 메시지 수신/읽음/수정/삭제/리액션 증분 반영
 - 부가 기능:
   - 파일 업로드 후 `upload_token` 기반 전송
   - 파일 목록/다운로드/삭제
@@ -46,6 +62,7 @@ python -m client.main --server-url http://127.0.0.1:5000
   - 관리자 목록 조회/권한 부여·해제
   - 설정(서버 URL, 시작프로그램, 트레이)
   - 시스템 트레이 상주/알림
+  - outbox 영속화 및 재시작 후 pending send 복구
 
 ## 동작 흐름
 
@@ -60,7 +77,6 @@ python -m client.main --server-url http://127.0.0.1:5000
 - 소켓 이벤트 확장 동기화:
   - `poll_created`, `poll_updated`, `admin_updated`, `pin_updated`
 - 채팅 렌더링 고도화:
-  - 리액션 실시간 반영
   - 답장/멘션/코드블록 UX 강화
 - 대량 메시지 최적화:
   - (반영) 증분 업데이트 인덱스(`message_id -> row`) 도입

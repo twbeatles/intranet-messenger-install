@@ -2,6 +2,10 @@
 
 # Doc-Code Consistency Audit (2026-02-24)
 
+Note:
+- This document is a historical snapshot of the 2026-02-24 audit.
+- For the current split layout (`app/bootstrap/*`, `app/http/*`, `app/realtime/*`, `client/controllers/*`, extracted `client/ui/*` helpers), use `docs/en/ARCHITECTURE.md` as the current source of truth.
+
 ## 1. Scope
 
 - Documents:

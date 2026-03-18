@@ -41,14 +41,23 @@ python -m client.main --server-url http://127.0.0.1:5000
 ## 디렉터리
 
 ```text
-app/                 Flask routes, sockets, models
-client/              PySide6 desktop client
-gui/                 PyQt6 server management GUI
+app/                 Flask app factory + public compatibility shims
+app/bootstrap/       runtime/bootstrap wiring
+app/http/            split REST route registration/helpers
+app/realtime/        split Socket.IO events/state/emission helpers
+client/              PySide6 desktop client entry/facade/services
+client/controllers/  desktop coordinators/router/policies
+client/ui/           Qt windows + extracted render helpers
+gui/                 PyQt6 server management GUI + split tray/process helpers
+static/css/          CSS manifest entry + split fragments
+static/js/modules/   module entry bridge for maintained web client
 i18n/                ko/en catalogs (server/client/web/server_gui)
 packaging/wix/       MSI .wxs templates
 scripts/             build/cutover automation
 docs/                ko/en documentation
 ```
+
+호환 진입점은 유지합니다. `app/routes.py`, `app/sockets.py`, `client/app_controller.py`, `static/css/style.css`는 외부 계약을 깨지 않도록 얇은 공개 레이어로 남겨둡니다.
 
 ## 테스트
 

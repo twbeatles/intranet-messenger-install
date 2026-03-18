@@ -32,18 +32,37 @@ Keep existing features/business logic while removing browser dependency and movi
 ## Server Layers
 
 - Entry: `server.py`
-- App factory: `app/__init__.py`
-- REST routes: `app/routes.py`
-- Socket events: `app/sockets.py`
+- App factory / composition root: `app/__init__.py`
+- Public compatibility layer: `app/routes.py`, `app/sockets.py`
+- Bootstrap layer: `app/bootstrap/*`
+- REST registration/helpers: `app/http/*`
+- Realtime events/state/emission helpers: `app/realtime/*`
 - Device-token auth: `app/auth_tokens.py`
 - Models: `app/models/*`
 
 ## Client Layers
 
 - Entry: `client/main.py`
-- Orchestration: `client/app_controller.py`
-- UI widgets: `client/ui/*`
+- Orchestration facade: `client/app_controller.py`
+- Coordinator layer: `client/controllers/*`
+- UI widgets/render helpers: `client/ui/*`
 - Services: `client/services/*`
+
+## Server GUI Layers
+
+- Server GUI shell: `gui/server_window.py`
+- Process launch/monitoring: `gui/server_process.py`
+- Tray creation: `gui/server_tray.py`
+- Settings/language application: `gui/server_settings.py`
+- Toast/view helpers: `gui/toast.py`, `gui/server_window_view.py`
+
+## Web Maintenance Layer
+
+- Template entry: `templates/index.html`
+- Public CSS entry: `static/css/style.css`
+  - actual rules are imported from `static/css/base.css` and split CSS fragments
+- Public JS entry: `static/js/modules/main.js`
+  - currently a maintenance bridge that loads the legacy web runtime in order
 
 ## Auth / Session Design
 

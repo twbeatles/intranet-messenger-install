@@ -43,6 +43,11 @@ Spec scope:
 - `messenger.spec`: `server.py` + `app/**` + `gui/**` + `static/`, `templates/`, `i18n/`, `certs/`
 - `messenger_client.spec`: `client/main.py` + `client/**` + `i18n/`
 
+Current split-layout packaging notes:
+- The server spec uses `collect_submodules("app")` and `collect_submodules("gui")`, so split modules under `app/bootstrap/*`, `app/http/*`, `app/realtime/*`, and helpers such as `gui/server_process.py` are included automatically.
+- The server spec also ships the whole `static/` tree, which covers the `static/css/style.css` manifest, split CSS fragments, and the `static/js/modules/main.js` bridge entry.
+- The client spec uses `collect_submodules("client")`, so `client/controllers/*` and extracted `client/ui/*` helper modules are included automatically.
+
 ## 3) Per-target Build
 
 Server only:
@@ -67,7 +72,7 @@ Client only:
 - missing module error:
   - run `pip install -r requirements.txt` again inside venv
   - `messenger.spec` uses `collect_submodules("app")` and `collect_submodules("gui")`
-  - `messenger_client.spec` uses `collect_submodules("client")`, so new client submodules are included by default
+  - `messenger_client.spec` uses `collect_submodules("client")`, so new client submodules under `client/controllers/*`, `client/services/*`, and `client/ui/*` are included by default
 
 ## 5) Next Step (MSI)
 

@@ -32,18 +32,37 @@
 ## 서버 계층
 
 - 엔트리: `server.py`
-- 앱 팩토리: `app/__init__.py`
-- 라우트: `app/routes.py`
-- 소켓 이벤트: `app/sockets.py`
+- 앱 팩토리/조립 루트: `app/__init__.py`
+- 공개 호환 레이어: `app/routes.py`, `app/sockets.py`
+- 부트스트랩 계층: `app/bootstrap/*`
+- REST 등록/헬퍼: `app/http/*`
+- 실시간 이벤트/상태/emit 헬퍼: `app/realtime/*`
 - 인증 토큰: `app/auth_tokens.py`
 - 모델: `app/models/*`
 
 ## 클라이언트 계층
 
 - 엔트리: `client/main.py`
-- 오케스트레이션: `client/app_controller.py`
-- UI 위젯: `client/ui/*`
+- 오케스트레이션 facade: `client/app_controller.py`
+- coordinator 계층: `client/controllers/*`
+- UI 위젯/렌더 헬퍼: `client/ui/*`
 - 서비스: `client/services/*`
+
+## 서버 GUI 계층
+
+- 서버 GUI shell: `gui/server_window.py`
+- 프로세스 실행/모니터링: `gui/server_process.py`
+- 트레이 생성: `gui/server_tray.py`
+- 설정/언어 적용: `gui/server_settings.py`
+- 토스트/뷰 헬퍼: `gui/toast.py`, `gui/server_window_view.py`
+
+## 웹 유지보수 계층
+
+- 템플릿 엔트리: `templates/index.html`
+- CSS 공개 엔트리: `static/css/style.css`
+  - 실제 규칙은 `static/css/base.css` 및 분할 CSS 파일로 import
+- JS 공개 엔트리: `static/js/modules/main.js`
+  - 현재는 유지보수 목적의 브리지 엔트리로 기존 웹 스크립트를 순차 로드
 
 ## 인증/세션 설계
 

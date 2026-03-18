@@ -41,14 +41,23 @@ Python `3.11` is the recommended verification baseline. Static analysis and edit
 ## Project Structure
 
 ```text
-app/                 Flask routes, sockets, models
-client/              PySide6 desktop client
-gui/                 PyQt6 server management GUI
+app/                 Flask app factory + public compatibility shims
+app/bootstrap/       runtime/bootstrap wiring
+app/http/            split REST route registration/helpers
+app/realtime/        split Socket.IO events/state/emission helpers
+client/              PySide6 desktop client entry/facade/services
+client/controllers/  desktop coordinators/router/policies
+client/ui/           Qt windows + extracted render helpers
+gui/                 PyQt6 server management GUI + split tray/process helpers
+static/css/          CSS manifest entry + split fragments
+static/js/modules/   module entry bridge for the maintained web client
 i18n/                ko/en catalogs (server/client/web/server_gui)
 packaging/wix/       MSI .wxs templates
 scripts/             build/cutover automation
 docs/                ko/en documentation
 ```
+
+Compatibility entry points remain stable. `app/routes.py`, `app/sockets.py`, `client/app_controller.py`, and `static/css/style.css` stay as thin public layers so external contracts do not move.
 
 ## Tests
 

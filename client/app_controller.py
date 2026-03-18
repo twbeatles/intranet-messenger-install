@@ -17,6 +17,12 @@ from typing import Any
 from PySide6.QtCore import QObject, QSettings, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
 
+from client.controllers.dialogs_controller import DialogsController
+from client.controllers.message_dispatcher import MessageDispatcher
+from client.controllers.rooms_coordinator import RoomsCoordinator
+from client.controllers.session_coordinator import SessionCoordinator
+from client.controllers.socket_router import SocketRouter
+from client.controllers.update_policy import should_block_unsigned_update, verify_update_metadata
 from client.i18n import i18n_manager, t
 from client.services.api_client import APIClient, ApiError
 from client.services.crypto_compat import CryptoError, decrypt_message, encrypt_message
@@ -113,8 +119,34 @@ class MessengerAppController(QObject):
         self._session_refresh_timer.setInterval(60_000)
         self._session_refresh_timer.timeout.connect(self._refresh_device_session_if_needed)
 
+        self._rooms_coordinator = RoomsCoordinator(self)
+        self._message_dispatcher = MessageDispatcher(self)
+        self._session_coordinator = SessionCoordinator(self)
+        self._socket_router = SocketRouter(self)
+        self._dialogs_controller = DialogsController(self)
+
         self._bind_events()
         self.i18n.subscribe(self._on_language_changed)
+
+    def _rooms_logic(self) -> RoomsCoordinator:
+        helper = getattr(self, '_rooms_coordinator', None)
+        return helper if isinstance(helper, RoomsCoordinator) else RoomsCoordinator(self)
+
+    def _message_logic(self) -> MessageDispatcher:
+        helper = getattr(self, '_message_dispatcher', None)
+        return helper if isinstance(helper, MessageDispatcher) else MessageDispatcher(self)
+
+    def _session_logic(self) -> SessionCoordinator:
+        helper = getattr(self, '_session_coordinator', None)
+        return helper if isinstance(helper, SessionCoordinator) else SessionCoordinator(self)
+
+    def _socket_logic(self) -> SocketRouter:
+        helper = getattr(self, '_socket_router', None)
+        return helper if isinstance(helper, SocketRouter) else SocketRouter(self)
+
+    def _dialogs_logic(self) -> DialogsController:
+        helper = getattr(self, '_dialogs_controller', None)
+        return helper if isinstance(helper, DialogsController) else DialogsController(self)
 
     def _on_language_changed(self) -> None:
         self.tray.app_name = t('app.name', 'Intranet Messenger')
@@ -134,177 +166,56 @@ class MessengerAppController(QObject):
 
     @staticmethod
     def _verify_update_metadata(payload: dict[str, Any]) -> tuple[bool, str]:
-        sha = str(payload.get('artifact_sha256') or '').strip()
-        sig = str(payload.get('artifact_signature') or '').strip()
-        alg = str(payload.get('signature_alg') or '').strip()
-        signature_required = bool(payload.get('signature_required', False))
-        if not sha and not sig:
-            if signature_required:
-                return False, 'signed update metadata is required'
-            return True, ''
-        if not sha:
-            return False, 'artifact_sha256 is missing'
-        if not sig:
-            return False, 'artifact_signature is missing'
-        if not alg:
-            return False, 'signature_alg is missing'
-        return True, ''
+        return verify_update_metadata(payload)
 
     @staticmethod
     def _should_block_unsigned_update(info: dict[str, Any]) -> tuple[bool, str]:
-        if not bool(info.get('signature_required', False)):
-            return False, ''
-        if bool(info.get('artifact_verified', False)):
-            return False, ''
-        reason = str(info.get('artifact_verification_reason') or 'signed update metadata verification failed')
-        return True, reason
+        return should_block_unsigned_update(info)
 
     @staticmethod
     def _parse_server_ts(raw: object) -> float:
-        text = str(raw or '').strip()
-        if not text:
-            return 0.0
-        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S'):
-            try:
-                return datetime.strptime(text, fmt).timestamp()
-            except ValueError:
-                continue
-        return 0.0
+        return SessionCoordinator.parse_server_ts(raw)
 
     def _update_session_expiry(self, payload: dict[str, Any]) -> None:
-        expires_epoch = self._parse_server_ts(payload.get('expires_at'))
-        self._session_expires_at_epoch = expires_epoch
-        if expires_epoch > 0:
-            now = time.time()
-            self._session_ttl_seconds = max(0.0, expires_epoch - now)
+        self._session_logic().update_session_expiry(payload)
 
     def _retry_after_unauthorized(self) -> bool:
-        return self._refresh_device_session_token(notify=False)
+        return self._session_logic().retry_after_unauthorized()
 
     def _refresh_device_session_token(self, *, notify: bool = False) -> bool:
-        if self._refresh_inflight:
-            return False
-        if not self.current_device_token:
-            return False
-        self._refresh_inflight = True
-        try:
-            payload = self.api.refresh_device_session(self.current_device_token)
-            rotated = str(payload.get('device_token_rotated') or self.current_device_token).strip()
-            if not rotated:
-                return False
-            self.current_device_token = rotated
-            self._update_session_expiry(payload)
-            if self._remember_device:
-                device_name = self.default_device_name()
-                stored = self.session_store.load()
-                if stored and stored.device_name:
-                    device_name = stored.device_name
-                self.session_store.save(
-                    StoredSession(
-                        server_url=self.current_server_url,
-                        device_token=self.current_device_token,
-                        device_name=device_name,
-                    )
-                )
-            if notify:
-                self.main_window.show_info(t('controller.session_refreshed', 'Session refreshed.'))
-            return True
-        except Exception:
-            return False
-        finally:
-            self._refresh_inflight = False
+        return self._session_logic().refresh_device_session_token(notify=notify)
 
     def _refresh_device_session_if_needed(self) -> None:
-        if not self.current_user:
-            return
-        if not self.current_device_token:
-            return
-        if self._session_expires_at_epoch <= 0:
-            return
-        now = time.time()
-        remaining = self._session_expires_at_epoch - now
-        threshold = max(300.0, self._session_ttl_seconds * 0.2 if self._session_ttl_seconds > 0 else 0.0)
-        if remaining > threshold:
-            return
-        self._refresh_device_session_token(notify=False)
+        self._session_logic().refresh_device_session_if_needed()
 
     def _upsert_outbox_entry(self, client_msg_id: str, entry: dict[str, Any]) -> None:
-        if not self.current_user:
-            return
-        user_id = int((self.current_user or {}).get('id') or 0)
-        if user_id <= 0:
-            return
-        payload = entry.get('payload')
-        if not isinstance(payload, dict):
-            payload = {}
-        self.outbox_store.upsert(
-            user_id=user_id,
-            server_url=self.current_server_url,
-            client_msg_id=client_msg_id,
-            payload=payload,
-            created_at=float(entry.get('created_at') or time.time()),
-            last_attempt_at=float(entry.get('last_attempt_at') or 0.0),
-            retry_count=int(entry.get('retry_count') or 0),
-            failed=bool(entry.get('failed')),
-        )
+        self._message_logic().upsert_outbox_entry(client_msg_id, entry)
 
     def _remove_outbox_entry(self, client_msg_id: str) -> None:
-        if not self.current_user:
-            return
-        user_id = int((self.current_user or {}).get('id') or 0)
-        if user_id <= 0:
-            return
-        self.outbox_store.remove(
-            user_id=user_id,
-            server_url=self.current_server_url,
-            client_msg_id=client_msg_id,
-        )
+        self._message_logic().remove_outbox_entry(client_msg_id)
 
     def _restore_pending_sends_from_outbox(self) -> None:
-        self._pending_sends.clear()
-        self._failed_send_ids = []
-        if not self.current_user:
-            return
-        user_id = int((self.current_user or {}).get('id') or 0)
-        if user_id <= 0:
-            return
-        entries = self.outbox_store.list_entries(user_id=user_id, server_url=self.current_server_url)
-        for row in entries:
-            client_msg_id = str(row.get('client_msg_id') or '').strip()
-            payload = row.get('payload') if isinstance(row.get('payload'), dict) else {}
-            if not client_msg_id or not payload:
-                continue
-            self._pending_sends[client_msg_id] = {
-                'payload': payload,
-                'created_at': float(row.get('created_at') or time.time()),
-                'last_attempt_at': float(row.get('last_attempt_at') or 0.0),
-                'retry_count': int(row.get('retry_count') or 0),
-                'failed': bool(row.get('failed')),
-                'is_file': bool(payload.get('type') in ('file', 'image')),
-                'file_name': str(payload.get('content') or ''),
-            }
-            if bool(row.get('failed')):
-                self._failed_send_ids.append(client_msg_id)
+        self._message_logic().restore_pending_sends_from_outbox()
 
     def _bind_events(self) -> None:
-        self.login_window.login_requested.connect(self._on_login_requested)
-        self.login_window.register_requested.connect(self._on_register_requested)
+        self.login_window.login_requested.connect(self._session_logic().on_login_requested)
+        self.login_window.register_requested.connect(self._session_logic().on_register_requested)
 
         self.main_window.refresh_rooms_requested.connect(self._load_rooms)
         self.main_window.room_selected.connect(self._on_room_selected)
         self.main_window.send_message_requested.connect(self._on_send_message_requested)
         self.main_window.send_file_requested.connect(self._on_send_file_requested)
-        self.main_window.logout_requested.connect(self._logout)
+        self.main_window.logout_requested.connect(self._session_logic().logout)
         self.main_window.search_requested.connect(self._on_search_input_changed)
-        self.main_window.open_settings_requested.connect(self._open_settings)
-        self.main_window.create_room_requested.connect(self._create_room)
-        self.main_window.invite_members_requested.connect(self._invite_members)
-        self.main_window.rename_room_requested.connect(self._rename_room)
-        self.main_window.leave_room_requested.connect(self._leave_room)
-        self.main_window.edit_profile_requested.connect(self._edit_profile)
-        self.main_window.open_polls_requested.connect(self._open_polls)
-        self.main_window.open_files_requested.connect(self._open_files)
-        self.main_window.open_admin_requested.connect(self._open_admin)
+        self.main_window.open_settings_requested.connect(self._dialogs_logic().open_settings)
+        self.main_window.create_room_requested.connect(self._dialogs_logic().create_room)
+        self.main_window.invite_members_requested.connect(self._dialogs_logic().invite_members)
+        self.main_window.rename_room_requested.connect(self._dialogs_logic().rename_room)
+        self.main_window.leave_room_requested.connect(self._dialogs_logic().leave_room)
+        self.main_window.edit_profile_requested.connect(self._dialogs_logic().edit_profile)
+        self.main_window.open_polls_requested.connect(self._dialogs_logic().open_polls)
+        self.main_window.open_files_requested.connect(self._dialogs_logic().open_files)
+        self.main_window.open_admin_requested.connect(self._dialogs_logic().open_admin)
         self.main_window.load_older_messages_requested.connect(self._load_older_messages)
         self.main_window.typing_changed.connect(self._on_typing_changed)
         self.main_window.retry_send_requested.connect(self._retry_failed_sends)
@@ -314,26 +225,26 @@ class MessengerAppController(QObject):
 
         self.socket.on('connect', lambda _: self.main_window.set_connected(True))
         self.socket.on('disconnect', lambda _: self.main_window.set_connected(False))
-        self.socket.on('new_message', self._on_socket_new_message)
-        self.socket.on('room_updated', self._on_socket_room_updated)
-        self.socket.on('room_name_updated', self._on_socket_room_name_updated)
-        self.socket.on('room_members_updated', self._on_socket_room_members_updated)
-        self.socket.on('read_updated', self._on_socket_read_updated)
-        self.socket.on('user_typing', self._on_socket_user_typing)
-        self.socket.on('message_edited', self._on_socket_message_edited)
-        self.socket.on('message_deleted', self._on_socket_message_deleted)
-        self.socket.on('reaction_updated', self._on_socket_reaction_updated)
-        self.socket.on('poll_updated', self._on_socket_poll_updated)
-        self.socket.on('poll_created', self._on_socket_poll_updated)
-        self.socket.on('pin_updated', self._on_socket_pin_updated)
-        self.socket.on('admin_updated', self._on_socket_admin_updated)
-        self.socket.on('error', self._on_socket_error)
+        self.socket.on('new_message', self._socket_logic().on_new_message)
+        self.socket.on('room_updated', self._socket_logic().on_room_updated)
+        self.socket.on('room_name_updated', self._socket_logic().on_room_name_updated)
+        self.socket.on('room_members_updated', self._socket_logic().on_room_members_updated)
+        self.socket.on('read_updated', self._socket_logic().on_read_updated)
+        self.socket.on('user_typing', self._socket_logic().on_user_typing)
+        self.socket.on('message_edited', self._socket_logic().on_message_edited)
+        self.socket.on('message_deleted', self._socket_logic().on_message_deleted)
+        self.socket.on('reaction_updated', self._socket_logic().on_reaction_updated)
+        self.socket.on('poll_updated', self._socket_logic().on_poll_updated)
+        self.socket.on('poll_created', self._socket_logic().on_poll_updated)
+        self.socket.on('pin_updated', self._socket_logic().on_pin_updated)
+        self.socket.on('admin_updated', self._socket_logic().on_admin_updated)
+        self.socket.on('error', self._socket_logic().on_error)
 
         self.tray.show_requested.connect(self._show_main_window)
-        self.tray.logout_requested.connect(self._logout)
-        self.tray.quit_requested.connect(self._quit)
+        self.tray.logout_requested.connect(self._session_logic().logout)
+        self.tray.quit_requested.connect(self._session_logic().quit)
 
-        self.settings_dialog.save_requested.connect(self._on_settings_saved)
+        self.settings_dialog.save_requested.connect(self._dialogs_logic().on_settings_saved)
         self.settings_dialog.check_update_requested.connect(self._check_update_policy)
 
         self.polls_dialog.refresh_requested.connect(self._refresh_polls)
@@ -343,8 +254,8 @@ class MessengerAppController(QObject):
 
         self.files_dialog.refresh_requested.connect(self._refresh_files)
         self.files_dialog.upload_requested.connect(self._on_send_file_requested)
-        self.files_dialog.download_requested.connect(self._download_room_file)
-        self.files_dialog.delete_requested.connect(self._delete_room_file)
+        self.files_dialog.download_requested.connect(self._dialogs_logic().download_room_file)
+        self.files_dialog.delete_requested.connect(self._dialogs_logic().delete_room_file)
 
         self.admin_dialog.refresh_requested.connect(self._refresh_admins)
         self.admin_dialog.set_admin_requested.connect(self._set_room_admin)
@@ -366,31 +277,7 @@ class MessengerAppController(QObject):
         self.login_window.show()
 
     def _try_restore_session(self) -> bool:
-        stored = self.session_store.load()
-        if not stored:
-            return False
-
-        try:
-            self.api.update_base_url(stored.server_url)
-            payload = self.api.refresh_device_session(stored.device_token)
-            rotated = payload.get('device_token_rotated') or stored.device_token
-            self._on_authenticated(
-                payload=payload,
-                server_url=stored.server_url,
-                remember=True,
-                device_name=stored.device_name,
-                device_token=rotated,
-            )
-            return True
-        except ApiError as exc:
-            if int(getattr(exc, 'status_code', 0)) == 401 or getattr(exc, 'error_code', '') in (
-                'AUTH_TOKEN_INVALID_OR_EXPIRED',
-                'AUTH_DEVICE_TOKEN_REQUIRED',
-            ):
-                self.session_store.clear()
-            return False
-        except Exception:
-            return False
+        return self._session_logic().try_restore_session()
 
     def _on_login_requested(
         self,
@@ -400,46 +287,10 @@ class MessengerAppController(QObject):
         device_name: str,
         remember: bool,
     ) -> None:
-        self.login_window.set_busy(True)
-        try:
-            self.api.update_base_url(server_url)
-            payload = self.api.create_device_session(
-                username=username,
-                password=password,
-                device_name=device_name,
-                remember=remember,
-            )
-            token = payload.get('device_token', '')
-            if not token:
-                raise RuntimeError(
-                    t(
-                        'controller.device_token_missing_in_response',
-                        'device_token is missing in login response',
-                    )
-                )
-
-            self._on_authenticated(
-                payload=payload,
-                server_url=server_url,
-                remember=remember,
-                device_name=device_name,
-                device_token=token,
-            )
-        except Exception as exc:
-            self.login_window.show_error(str(exc))
-        finally:
-            self.login_window.set_busy(False)
+        self._session_logic().on_login_requested(server_url, username, password, device_name, remember)
 
     def _on_register_requested(self, server_url: str, username: str, password: str, nickname: str) -> None:
-        self.login_window.set_busy(True)
-        try:
-            self.api.update_base_url(server_url)
-            self.api.register(username=username, password=password, nickname=nickname)
-            self.login_window.show_info(t('controller.register_success', 'Registered successfully. Please log in.'))
-        except Exception as exc:
-            self.login_window.show_error(str(exc))
-        finally:
-            self.login_window.set_busy(False)
+        self._session_logic().on_register_requested(server_url, username, password, nickname)
 
     def _on_authenticated(
         self,
@@ -450,56 +301,13 @@ class MessengerAppController(QObject):
         device_name: str,
         device_token: str,
     ) -> None:
-        self.current_user = payload.get('user') or {}
-        self.current_server_url = server_url.rstrip('/')
-        self.preferred_server_url = self.current_server_url
-        self.current_device_token = device_token
-        self._remember_device = bool(remember)
-        self._update_session_expiry(payload)
-        self.current_room_id = None
-        self.current_room_key = ''
-        self._message_history_has_more = False
-        self._message_history_loading = False
-        self._refresh_inflight = False
-
-        if remember:
-            self.session_store.save(
-                StoredSession(
-                    server_url=self.current_server_url,
-                    device_token=device_token,
-                    device_name=device_name,
-                )
-            )
-        else:
-            self.session_store.clear()
-
-        self._restore_pending_sends_from_outbox()
-        if self.current_user is None:
-            raise RuntimeError('authenticated session is missing user payload')
-        self.main_window.set_user(self.current_user)
-        self._show_main_window()
-        self.login_window.hide()
-
-        try:
-            cookie_header = self.api.get_cookie_header()
-            self.socket.connect(
-                self.current_server_url,
-                cookie_header=cookie_header,
-                language=self.i18n.display_locale,
-            )
-        except Exception as exc:
-            self.main_window.show_error(
-                t('controller.socket_connection_failed', 'Socket connection failed: {error}', error=str(exc))
-            )
-
-        self._load_rooms()
-        self._check_update_policy()
-        self._pending_send_timer.start()
-        self._session_refresh_timer.start()
-        for msg_id, entry in list(self._pending_sends.items()):
-            if not entry.get('failed'):
-                self._dispatch_pending_send(msg_id)
-        self.tray.notify(t('app.name', 'Intranet Messenger'), t('tray.signed_in', 'Signed in successfully.'))
+        self._session_logic().on_authenticated(
+            payload=payload,
+            server_url=server_url,
+            remember=remember,
+            device_name=device_name,
+            device_token=device_token,
+        )
 
     def _show_main_window(self) -> None:
         self.main_window.show()
@@ -524,72 +332,26 @@ class MessengerAppController(QObject):
 
     @staticmethod
     def _normalize_room_ids(rooms: list[dict[str, Any]]) -> tuple[int, ...]:
-        ids: set[int] = set()
-        for room in rooms:
-            try:
-                room_id = int(room.get('id') or 0)
-            except (TypeError, ValueError):
-                room_id = 0
-            if room_id > 0:
-                ids.add(room_id)
-        return tuple(sorted(ids))
+        return RoomsCoordinator.normalize_room_ids(rooms)
 
     @staticmethod
     def _build_rooms_signature(rooms: list[dict[str, Any]]) -> tuple[tuple[int, str, str, int, int, str], ...]:
-        signature: list[tuple[int, str, str, int, int, str]] = []
-        for room in rooms:
-            try:
-                room_id = int(room.get('id') or 0)
-            except (TypeError, ValueError):
-                room_id = 0
-            signature.append(
-                (
-                    room_id,
-                    str(room.get('name') or ''),
-                    str(room.get('last_message_time') or ''),
-                    int(room.get('unread_count') or 0),
-                    int(room.get('pinned') or 0),
-                    str(room.get('last_message_preview') or ''),
-                )
-            )
-        return tuple(signature)
+        return RoomsCoordinator.build_rooms_signature(rooms)
 
     def _set_rooms_view(self, rooms: list[dict[str, Any]], *, force: bool = False) -> bool:
-        signature = self._build_rooms_signature(rooms)
-        if not force and self._visible_rooms_signature == signature:
-            return False
-        self.main_window.set_rooms(rooms)
-        self._visible_rooms_signature = signature
-        return True
+        return self._rooms_logic().set_rooms_view(rooms, force=force)
 
     def _sync_socket_room_subscriptions(self, rooms: list[dict[str, Any]]) -> None:
-        room_ids = self._normalize_room_ids(rooms)
-        if room_ids == self._last_subscribed_room_ids:
-            return
-        self.socket.subscribe_rooms(list(room_ids))
-        self._last_subscribed_room_ids = room_ids
+        self._rooms_logic().sync_socket_room_subscriptions(rooms)
 
     def _clear_remote_search_cache(self) -> None:
-        self._remote_search_cache.clear()
+        self._rooms_logic().clear_remote_search_cache()
 
     def _get_cached_remote_search_room_ids(self, query: str, room_id: int) -> set[int] | None:
-        key = (str(query or '').strip().lower(), int(room_id or 0))
-        if not key[0]:
-            return None
-        entry = self._remote_search_cache.get(key)
-        if not entry:
-            return None
-        cached_at, matched_ids = entry
-        if (time.time() - float(cached_at)) > float(self._remote_search_cache_ttl_seconds):
-            self._remote_search_cache.pop(key, None)
-            return None
-        return set(matched_ids)
+        return self._rooms_logic().get_cached_remote_search_room_ids(query, room_id)
 
     def _store_cached_remote_search_room_ids(self, query: str, room_id: int, matched_ids: set[int]) -> None:
-        key = (str(query or '').strip().lower(), int(room_id or 0))
-        if not key[0]:
-            return
-        self._remote_search_cache[key] = (time.time(), set(matched_ids))
+        self._rooms_logic().store_cached_remote_search_room_ids(query, room_id, matched_ids)
 
     def _on_room_selected(self, room_id: int) -> None:
         if self._typing_sent and self._typing_room_id:
@@ -754,127 +516,25 @@ class MessengerAppController(QObject):
             self.main_window.show_error(str(exc))
 
     def _dispatch_pending_send(self, client_msg_id: str) -> None:
-        entry = self._pending_sends.get(client_msg_id)
-        if not entry:
-            return
-        entry['last_attempt_at'] = time.time()
-        entry['failed'] = False
-        self._upsert_outbox_entry(client_msg_id, entry)
-        payload = dict(entry.get('payload') or {})
-
-        def _ack_callback(raw_ack: dict[str, Any] | Any) -> None:
-            ack = raw_ack if isinstance(raw_ack, dict) else {}
-            self._handle_send_ack(client_msg_id, ack)
-
-        try:
-            self.socket.send_message(payload, ack_callback=_ack_callback)
-        except Exception:
-            # keep pending; timeout loop will retry
-            pass
+        self._message_logic().dispatch_pending_send(client_msg_id)
 
     def _handle_send_ack(self, client_msg_id: str, ack: dict[str, Any]) -> None:
-        entry = self._pending_sends.get(client_msg_id)
-        if not entry:
-            return
-        if bool(ack.get('ok')):
-            if bool(entry.get('is_file')):
-                file_name = str(entry.get('file_name') or '')
-                if file_name:
-                    self.tray.notify(
-                        t('app.name', 'Intranet Messenger'),
-                        t('files.upload', 'Upload') + f': {file_name}',
-                    )
-            self._pending_sends.pop(client_msg_id, None)
-            self._remove_outbox_entry(client_msg_id)
-            if client_msg_id in self._failed_send_ids:
-                self._failed_send_ids.remove(client_msg_id)
-            self._refresh_delivery_state()
-            return
-
-        # 서버가 즉시 실패를 반환한 경우 재시도 없이 실패 처리
-        entry['failed'] = True
-        self._upsert_outbox_entry(client_msg_id, entry)
-        if client_msg_id not in self._failed_send_ids:
-            self._failed_send_ids.append(client_msg_id)
-        error_message = str(ack.get('error') or '').strip()
-        if error_message:
-            self.main_window.show_error(error_message)
-        self._refresh_delivery_state()
+        self._message_logic().handle_send_ack(client_msg_id, ack)
 
     def _process_pending_sends(self) -> None:
-        now = time.time()
-        changed = False
-        for client_msg_id, entry in list(self._pending_sends.items()):
-            if entry.get('failed'):
-                continue
-            last_attempt = float(entry.get('last_attempt_at') or 0.0)
-            if last_attempt <= 0:
-                continue
-            if now - last_attempt < self._send_timeout_seconds:
-                continue
-
-            retries = int(entry.get('retry_count') or 0)
-            if retries >= self._send_retry_limit:
-                entry['failed'] = True
-                self._upsert_outbox_entry(client_msg_id, entry)
-                if client_msg_id not in self._failed_send_ids:
-                    self._failed_send_ids.append(client_msg_id)
-                changed = True
-                continue
-
-            entry['retry_count'] = retries + 1
-            self._upsert_outbox_entry(client_msg_id, entry)
-            self._dispatch_pending_send(client_msg_id)
-            changed = True
-
-        if changed:
-            self._refresh_delivery_state()
+        self._message_logic().process_pending_sends()
 
     def _retry_failed_sends(self) -> None:
-        pending_retry = [msg_id for msg_id in self._failed_send_ids if msg_id in self._pending_sends]
-        self._failed_send_ids = []
-        for client_msg_id in pending_retry:
-            entry = self._pending_sends.get(client_msg_id)
-            if not entry:
-                continue
-            entry['failed'] = False
-            entry['retry_count'] = 0
-            self._upsert_outbox_entry(client_msg_id, entry)
-            self._dispatch_pending_send(client_msg_id)
-        self._refresh_delivery_state()
+        self._message_logic().retry_failed_sends()
 
     def _refresh_delivery_state(self) -> None:
-        pending_count = len([1 for entry in self._pending_sends.values() if not entry.get('failed')])
-        failed_count = len(self._failed_send_ids)
-        if failed_count > 0:
-            self.main_window.set_delivery_state('failed', failed_count)
-            return
-        if pending_count > 0:
-            self.main_window.set_delivery_state('pending', pending_count)
-            return
-        self.main_window.set_delivery_state('idle', 0)
+        self._message_logic().refresh_delivery_state()
 
     def _on_typing_changed(self, is_typing: bool) -> None:
-        if not self.current_room_id:
-            return
-        self._typing_pending = bool(is_typing)
-        self._typing_debounce_timer.start(500 if is_typing else 150)
+        self._message_logic().on_typing_changed(is_typing)
 
     def _flush_typing_state(self) -> None:
-        if self._typing_pending is None:
-            return
-        room_id = int(self.current_room_id or 0)
-        if room_id <= 0:
-            return
-        next_state = bool(self._typing_pending)
-        if next_state == self._typing_sent and self._typing_room_id == room_id:
-            return
-        try:
-            self.socket.send_typing(room_id, next_state)
-            self._typing_sent = next_state
-            self._typing_room_id = room_id
-        except Exception:
-            pass
+        self._message_logic().flush_typing_state()
 
     def _on_socket_new_message(self, message: dict[str, Any]) -> None:
         client_msg_id = str(message.get('client_msg_id') or '').strip()
@@ -908,17 +568,7 @@ class MessengerAppController(QObject):
         self._set_rooms_view(self.rooms_cache)
 
     def _extract_room_id(self, payload: dict[str, Any]) -> int | None:
-        value = payload.get('room_id')
-        if value is None:
-            poll_value = payload.get('poll')
-            poll = poll_value if isinstance(poll_value, dict) else {}
-            value = poll.get('room_id')
-        if value is None:
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
+        return self._rooms_logic().extract_room_id(payload)
 
     def _on_socket_room_name_updated(self, payload: dict[str, Any]) -> None:
         room_id = self._extract_room_id(payload)
@@ -1066,65 +716,23 @@ class MessengerAppController(QObject):
             self._refresh_admins(silent=True)
 
     def _preview_for_message(self, message: dict[str, Any]) -> str:
-        message_type = str(message.get('message_type') or message.get('type') or 'text')
-        content = str(message.get('display_content') or message.get('content') or '')
-        encrypted = bool(message.get('encrypted', False))
-        file_name = str(message.get('file_name') or content or '')
-
-        if message_type == 'image':
-            return t('rooms.preview.image', '📷 Image')
-        if message_type == 'file':
-            return file_name or t('rooms.preview.file', '📎 File')
-        if message_type == 'system':
-            preview = content.strip()
-            return preview[:25] + ('...' if len(preview) > 25 else '') if preview else t('rooms.preview.system', '🔔 System message')
-        if encrypted:
-            return t('rooms.preview.encrypted', '🔒 Encrypted message')
-        preview = content.strip()
-        if not preview:
-            return t('rooms.preview.message', 'Message')
-        return preview[:25] + ('...' if len(preview) > 25 else '')
+        return self._rooms_logic().preview_for_message(message)
 
     def _sort_rooms_cache(self) -> None:
-        def _sort_key(room: dict[str, Any]):
-            pinned = int(room.get('pinned') or 0)
-            ts = str(room.get('last_message_time') or '')
-            return (pinned, ts)
-
-        self.rooms_cache.sort(key=_sort_key, reverse=True)
+        self._rooms_logic().sort_rooms_cache()
 
     def _update_room_cache_name(self, room_id: int | None, name: str) -> None:
-        if not room_id or not name:
-            return
-        for room in self.rooms_cache:
-            if int(room.get('id') or 0) == int(room_id):
-                room['name'] = name
-                break
+        self._rooms_logic().update_room_cache_name(room_id, name)
 
     def _set_room_unread(self, room_id: int, unread: int) -> None:
-        for room in self.rooms_cache:
-            if int(room.get('id') or 0) == int(room_id):
-                room['unread_count'] = max(0, int(unread))
-                break
+        self._rooms_logic().set_room_unread(room_id, unread)
 
     def _update_room_cache_from_message(self, *, room_id: int, message: dict[str, Any], increment_unread: bool) -> None:
-        if room_id <= 0:
-            return
-        target = None
-        for room in self.rooms_cache:
-            if int(room.get('id') or 0) == room_id:
-                target = room
-                break
-        if not target:
-            self._schedule_rooms_reload(150)
-            return
-        target['last_message_preview'] = self._preview_for_message(message)
-        target['last_message_time'] = str(message.get('created_at') or target.get('last_message_time') or '')
-        if increment_unread:
-            target['unread_count'] = int(target.get('unread_count') or 0) + 1
-        elif self.current_room_id and int(self.current_room_id) == room_id:
-            target['unread_count'] = 0
-        self._sort_rooms_cache()
+        self._rooms_logic().update_room_cache_from_message(
+            room_id=room_id,
+            message=message,
+            increment_unread=increment_unread,
+        )
 
     def _on_socket_error(self, payload: dict[str, Any]) -> None:
         message = (
@@ -1135,62 +743,17 @@ class MessengerAppController(QObject):
         self.main_window.show_error(str(message))
 
     def _on_search_input_changed(self, query: str) -> None:
-        self._pending_search_query = str(query or '')
-        self._search_debounce_timer.start(300)
+        self._rooms_logic().on_search_input_changed(query)
 
     def _flush_search_request(self) -> None:
         self._on_search_requested(self._pending_search_query)
 
     def _on_search_requested(self, query: str) -> None:
-        query = query.strip()
-        if not query:
-            self._set_rooms_view(self.rooms_cache)
-            return
-        lowered = query.lower()
-        filtered = [
-            room
-            for room in self.rooms_cache
-            if lowered in str(room.get('name', '')).lower()
-            or lowered in str(room.get('last_message_preview', '')).lower()
-        ]
-        if filtered:
-            self._set_rooms_view(filtered)
-            return
-
-        if len(query) < 2:
-            self._set_rooms_view([])
-            return
-
-        try:
-            scoped_room_id = int(self.current_room_id) if self.current_room_id else 0
-            matched_room_ids = self._get_cached_remote_search_room_ids(query, scoped_room_id)
-            if matched_room_ids is None:
-                results = self.api.search_messages(
-                    query,
-                    int(self.current_room_id) if self.current_room_id else None,
-                    limit=20,
-                )
-                matched_room_ids = {
-                    int(row.get('room_id') or 0)
-                    for row in results
-                    if isinstance(row, dict) and int(row.get('room_id') or 0) > 0
-                }
-                self._store_cached_remote_search_room_ids(query, scoped_room_id, matched_room_ids)
-            remote_filtered = [
-                room for room in self.rooms_cache if int(room.get('id') or 0) in matched_room_ids
-            ]
-            self._set_rooms_view(remote_filtered)
-        except Exception:
-            self._set_rooms_view([])
+        self._rooms_logic().on_search_requested(query)
 
     @staticmethod
     def _guess_message_type(file_name: str, from_server: str | None = None) -> str:
-        if from_server in ('image', 'file'):
-            return from_server
-        mime, _ = mimetypes.guess_type(file_name)
-        if mime and mime.startswith('image/'):
-            return 'image'
-        return 'file'
+        return MessageDispatcher.guess_message_type(file_name, from_server)
 
     def _require_room(self) -> int | None:
         if not self.current_room_id:
@@ -1658,69 +1221,10 @@ class MessengerAppController(QObject):
             )
 
     def _logout(self) -> None:
-        self._rooms_reload_timer.stop()
-        self._typing_debounce_timer.stop()
-        self._search_debounce_timer.stop()
-        self._pending_send_timer.stop()
-        self._session_refresh_timer.stop()
-        try:
-            self.socket.disconnect()
-        except Exception:
-            pass
-        try:
-            self.api.revoke_current_device_session(self.current_device_token)
-        except Exception:
-            pass
-        try:
-            if self.current_user:
-                self.outbox_store.clear(
-                    user_id=int((self.current_user or {}).get('id') or 0),
-                    server_url=self.current_server_url,
-                )
-        except Exception:
-            pass
-        self.session_store.clear()
-        self.current_user = None
-        self.current_room_id = None
-        self.current_room_key = ''
-        self.current_device_token = ''
-        self._visible_rooms_signature = None
-        self._last_subscribed_room_ids = ()
-        self._clear_remote_search_cache()
-        self._remember_device = False
-        self._session_expires_at_epoch = 0.0
-        self._session_ttl_seconds = 0.0
-        self._refresh_inflight = False
-        self.current_room_members = []
-        self.current_admin_ids = set()
-        self.current_is_admin = False
-        self._typing_pending = None
-        self._typing_sent = False
-        self._typing_room_id = None
-        self._pending_sends.clear()
-        self._failed_send_ids.clear()
-        self.main_window.set_delivery_state('idle', 0)
-        self.main_window.hide()
-        self.polls_dialog.hide()
-        self.files_dialog.hide()
-        self.admin_dialog.hide()
-        self.settings_dialog.hide()
-        self.login_window.set_server_url(self.preferred_server_url)
-        self.login_window.show()
-        self.tray.notify(t('app.name', 'Intranet Messenger'), t('tray.signed_out', 'Signed out.'))
+        self._session_logic().logout()
 
     def _quit(self) -> None:
-        self._typing_debounce_timer.stop()
-        self._search_debounce_timer.stop()
-        self._pending_send_timer.stop()
-        self._session_refresh_timer.stop()
-        try:
-            self.socket.disconnect()
-        except Exception:
-            pass
-        self.api.close()
-        self.tray.hide()
-        self.app.quit()
+        self._session_logic().quit()
 
     @staticmethod
     def default_device_name() -> str:

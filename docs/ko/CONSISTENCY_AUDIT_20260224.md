@@ -2,6 +2,10 @@
 
 # 문서-코드 정합성 점검 (2026-02-24)
 
+참고:
+- 이 문서는 2026-02-24 시점 감사를 기록한 스냅샷입니다.
+- 현재 분할 구조(`app/bootstrap/*`, `app/http/*`, `app/realtime/*`, `client/controllers/*`, `client/ui/*` helper)는 최신 `docs/ko/ARCHITECTURE.md`를 기준으로 봐야 합니다.
+
 ## 1. 점검 범위
 
 - 문서:

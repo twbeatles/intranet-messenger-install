@@ -72,11 +72,19 @@ build/
 dist/
 *.exe
 *.msi
+*.msp
+*.msm
 *.zip
 *.7z
 *.whl
 *.egg-info/
 .eggs/
+*.pyz
+*.wixpdb
+*.wixobj
+*.wixlib
+*.wixout
+*.cab
 
 # ------------------------------------------------------------
 # Certificates / keys

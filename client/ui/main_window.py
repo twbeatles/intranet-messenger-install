@@ -10,10 +10,7 @@ from typing import Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QFileDialog,
-    QFrame,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -21,14 +18,15 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QSplitter,
     QTextEdit,
-    QVBoxLayout,
     QWidget,
 )
 
 from client.i18n import i18n_manager, t
-from client.ui.theme import avatar_color, avatar_text_color
+from client.ui.main_window_sections import build_main_window_layout
+from client.ui.message_formatters import contains_mention, format_reactions
+from client.ui.message_list import build_message_container
+from client.ui.room_list import build_room_item_widget, populate_rooms_list
 
 
 class _ComposerTextEdit(QTextEdit):
@@ -46,6 +44,32 @@ class _ComposerTextEdit(QTextEdit):
 
 
 class MainWindow(QMainWindow):
+    user_label: QLabel
+    connection_label: QLabel
+    settings_btn: QPushButton
+    profile_btn: QPushButton
+    search_input: QLineEdit
+    rooms_list: QListWidget
+    new_room_btn: QPushButton
+    refresh_btn: QPushButton
+    logout_btn: QPushButton
+    room_title: QLabel
+    room_meta: QLabel
+    invite_btn: QPushButton
+    rename_btn: QPushButton
+    leave_btn: QPushButton
+    polls_btn: QPushButton
+    files_btn: QPushButton
+    admin_btn: QPushButton
+    messages_list: QListWidget
+    message_input: _ComposerTextEdit
+    compose_hint_label: QLabel
+    delivery_state_label: QLabel
+    retry_send_btn: QPushButton
+    attach_btn: QPushButton
+    send_btn: QPushButton
+    _inbox_title_label: QLabel
+
     room_selected = Signal(int)
     refresh_rooms_requested = Signal()
     create_room_requested = Signal()
@@ -93,212 +117,8 @@ class MainWindow(QMainWindow):
         self.retranslate_ui()
 
     def _build_ui(self) -> None:
-        root = QWidget()
-        root.setObjectName("AppRoot")
+        root = build_main_window_layout(self, _ComposerTextEdit)
         self.setCentralWidget(root)
-
-        layout = QVBoxLayout(root)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(10)
-
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-
-        # ── Left Panel (sidebar) ────────────────────────────
-        left_panel = QFrame()
-        left_panel.setProperty('sidebar', True)
-        left_panel.setMinimumWidth(320)
-        left_panel.setMaximumWidth(420)
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(24, 28, 24, 24)
-        left_layout.setSpacing(20)
-
-        user_header = QHBoxLayout()
-        user_info = QVBoxLayout()
-        self.user_label = QLabel('')
-        self.user_label.setProperty('section', True)
-        self.connection_label = QLabel('')
-        self.connection_label.setProperty('status', 'disconnected')
-        user_info.addWidget(self.user_label)
-        user_info.addSpacing(2)
-        user_info.addWidget(self.connection_label)
-
-        self.settings_btn = QPushButton('⚙️')
-        self.settings_btn.setProperty('variant', 'icon')
-        self.settings_btn.setFixedSize(36, 36)
-        self.profile_btn = QPushButton('')
-
-        user_header.addLayout(user_info)
-        user_header.addStretch()
-        user_header.addWidget(self.profile_btn)
-        user_header.addWidget(self.settings_btn)
-
-        inbox_title = QLabel('')
-        inbox_title.setProperty('subtitle', True)
-        self._inbox_title_label = inbox_title
-
-        self.search_input = QLineEdit()
-        self.rooms_list = QListWidget()
-        self.rooms_list.setSpacing(6)
-        self.rooms_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.rooms_list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-
-        left_layout.addLayout(user_header)
-        left_layout.addSpacing(4)
-        left_layout.addWidget(self.search_input)
-        left_layout.addSpacing(4)
-        left_layout.addWidget(inbox_title)
-        left_layout.addWidget(self.rooms_list)
-
-        left_actions = QHBoxLayout()
-        self.new_room_btn = QPushButton('')
-        self.refresh_btn = QPushButton('')
-        self.logout_btn = QPushButton('')
-        self.logout_btn.setProperty('variant', 'danger')
-        left_actions.addWidget(self.new_room_btn)
-        left_actions.addWidget(self.refresh_btn)
-        left_actions.addStretch()
-        left_actions.addWidget(self.logout_btn)
-        left_layout.addLayout(left_actions)
-
-        splitter.addWidget(left_panel)
-
-        # ── Right Panel (chat area) ─────────────────────────
-        right_panel = QFrame()
-        right_panel.setProperty('chatArea', True)
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-
-        # Room Header
-        room_header = QFrame()
-        room_header.setStyleSheet(
-            "background: #ffffff; border-bottom: 1px solid #e2e8f0; border-top-right-radius: 12px;"
-        )
-        room_header_layout = QHBoxLayout(room_header)
-        room_header_layout.setContentsMargins(28, 22, 28, 22)
-
-        self.room_title = QLabel('')
-        self.room_title.setProperty('section', True)
-        self.room_title.setStyleSheet("font-size: 16pt;")
-        self.room_meta = QLabel('')
-        self.room_meta.setProperty('muted', True)
-
-        # Room action buttons — 두 그룹으로 분리
-        self.invite_btn = QPushButton('')
-        self.rename_btn = QPushButton('')
-        self.leave_btn = QPushButton('')
-        self.leave_btn.setProperty('variant', 'danger')
-
-        self.polls_btn = QPushButton('')
-        self.files_btn = QPushButton('')
-        self.admin_btn = QPushButton('')
-        self.polls_btn.setProperty('variant', 'primary')
-
-        header_titles = QVBoxLayout()
-        header_titles.setSpacing(4)
-        header_titles.addWidget(self.room_title)
-        header_titles.addWidget(self.room_meta)
-        room_header_layout.addLayout(header_titles)
-        room_header_layout.addStretch()
-
-        # Feature actions group (Polls | Files | Admin)
-        feature_group = QHBoxLayout()
-        feature_group.setSpacing(4)
-        feature_group.addWidget(self.polls_btn)
-        feature_group.addWidget(self.files_btn)
-        feature_group.addWidget(self.admin_btn)
-        room_header_layout.addLayout(feature_group)
-
-        # Separator between groups
-        header_sep = QFrame()
-        header_sep.setFrameShape(QFrame.Shape.VLine)
-        header_sep.setStyleSheet("color: #e2e8f0; max-width: 1px; margin: 4px 6px;")
-        room_header_layout.addWidget(header_sep)
-
-        # Room management group (Invite | Rename | Leave)
-        manage_group = QHBoxLayout()
-        manage_group.setSpacing(4)
-        manage_group.addWidget(self.invite_btn)
-        manage_group.addWidget(self.rename_btn)
-        manage_group.addWidget(self.leave_btn)
-        room_header_layout.addLayout(manage_group)
-
-        # Messages list
-        self.messages_list = QListWidget()
-        self.messages_list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.messages_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.messages_list.setSpacing(18)
-        self.messages_list.setStyleSheet(
-            "background: #f8fafc; padding: 24px 32px; border: none;"
-        )
-        self.messages_list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.messages_list.verticalScrollBar().valueChanged.connect(self._on_messages_scrolled)
-
-        # Compose box
-        compose_box = QFrame()
-        compose_box.setStyleSheet(
-            "background: #ffffff; border-top: 1px solid #e2e8f0; border-bottom-right-radius: 12px;"
-        )
-        compose_box_layout = QVBoxLayout(compose_box)
-        compose_box_layout.setContentsMargins(24, 20, 24, 20)
-        compose_box_layout.setSpacing(12)
-
-        self.message_input = _ComposerTextEdit()
-        self.message_input.setFixedHeight(94)
-        self.message_input.setStyleSheet(
-            "border: none; background: transparent; font-size: 11pt;"
-        )
-
-        compose_meta = QHBoxLayout()
-        self.compose_hint_label = QLabel('')
-        self.compose_hint_label.setProperty('muted', True)
-        compose_meta.addWidget(self.compose_hint_label)
-        self.delivery_state_label = QLabel('')
-        self.delivery_state_label.setProperty('muted', True)
-        self.retry_send_btn = QPushButton('')
-        self.retry_send_btn.setVisible(False)
-        self.retry_send_btn.setProperty('variant', 'danger')
-        compose_meta.addWidget(self.delivery_state_label)
-        compose_meta.addWidget(self.retry_send_btn)
-        compose_meta.addStretch()
-
-        self.attach_btn = QPushButton('')
-        self.send_btn = QPushButton('')
-        self.send_btn.setProperty('variant', 'primary')
-        self.send_btn.setMinimumWidth(80)
-        compose_meta.addWidget(self.attach_btn)
-        compose_meta.addWidget(self.send_btn)
-
-        compose_box_layout.addWidget(self.message_input)
-        compose_box_layout.addLayout(compose_meta)
-
-        right_layout.addWidget(room_header)
-        right_layout.addWidget(self.messages_list)
-        right_layout.addWidget(compose_box)
-
-        splitter.addWidget(right_panel)
-        splitter.setSizes([330, 930])
-        layout.addWidget(splitter)
-
-        # Signal connections
-        self.profile_btn.clicked.connect(self.edit_profile_requested.emit)
-        self.refresh_btn.clicked.connect(self.refresh_rooms_requested.emit)
-        self.new_room_btn.clicked.connect(self.create_room_requested.emit)
-        self.logout_btn.clicked.connect(self.logout_requested.emit)
-        self.settings_btn.clicked.connect(self.open_settings_requested.emit)
-        self.invite_btn.clicked.connect(self.invite_members_requested.emit)
-        self.rename_btn.clicked.connect(self.rename_room_requested.emit)
-        self.leave_btn.clicked.connect(self.leave_room_requested.emit)
-        self.polls_btn.clicked.connect(self.open_polls_requested.emit)
-        self.files_btn.clicked.connect(self.open_files_requested.emit)
-        self.admin_btn.clicked.connect(self.open_admin_requested.emit)
-        self.retry_send_btn.clicked.connect(self.retry_send_requested.emit)
-        self.send_btn.clicked.connect(self._emit_send_message)
-        self.attach_btn.clicked.connect(self._select_file)
-        self.rooms_list.currentRowChanged.connect(self._on_room_row_changed)
-        self.search_input.textChanged.connect(self.search_requested.emit)
-        self.message_input.send_shortcut_triggered.connect(self._emit_send_message)
-        self.message_input.textChanged.connect(self._on_message_text_changed)
         self._set_room_actions_enabled(False)
 
     # ── Public API ──────────────────────────────────────────
@@ -332,41 +152,7 @@ class MainWindow(QMainWindow):
         self._set_room_actions_enabled(False)
 
     def set_rooms(self, rooms: list[dict[str, Any]]) -> None:
-        current_room_id = self._room_id_by_row.get(self.rooms_list.currentRow())
-        self.rooms_list.clear()
-        self._room_id_by_row.clear()
-        selected_row = -1
-
-        for room in rooms:
-            room_id = room.get('id')
-            if room_id is None:
-                continue
-            try:
-                normalized_room_id = int(room_id)
-            except (TypeError, ValueError):
-                continue
-
-            item = QListWidgetItem()
-            widget = self._build_room_item_widget(room)
-            item.setSizeHint(widget.sizeHint())
-            item.setData(Qt.ItemDataRole.UserRole, normalized_room_id)
-            self.rooms_list.addItem(item)
-            row = self.rooms_list.count() - 1
-            self.rooms_list.setItemWidget(item, widget)
-            self._room_id_by_row[row] = normalized_room_id
-            if current_room_id and normalized_room_id == current_room_id:
-                selected_row = row
-
-        if self.rooms_list.count() == 0:
-            empty_item = QListWidgetItem(t('main.rooms_empty', 'No rooms available.'))
-            empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
-            self.rooms_list.addItem(empty_item)
-            self._set_room_actions_enabled(False)
-            self.compose_hint_label.setText(t('main.compose_no_room', 'No room selected'))
-            return
-
-        if selected_row >= 0:
-            self.rooms_list.setCurrentRow(selected_row)
+        populate_rooms_list(self, rooms)
 
     def set_room_title(self, title: str) -> None:
         self._current_room_name = title or t('main.select_room', 'Select a room')
@@ -599,104 +385,7 @@ class MainWindow(QMainWindow):
         self.messages_list.setItemWidget(item, container)
 
     def _build_message_container(self, message: dict[str, Any]) -> QWidget:
-        sender = str(
-            message.get('sender_name')
-            or message.get('sender_id')
-            or t('common.unknown', 'unknown')
-        )
-        content = str(message.get('display_content') or message.get('content') or '')
-        timestamp = str(message.get('created_at') or '')
-        reply_sender = str(message.get('reply_sender') or '')
-        reply_content = str(message.get('reply_content') or '')
-        reactions = message.get('reactions') or []
-        try:
-            sender_id = int(message.get('sender_id') or 0)
-        except (TypeError, ValueError):
-            sender_id = 0
-        is_own = sender_id > 0 and sender_id == self._current_user_id
-
-        container = QWidget()
-        container.setStyleSheet("background: transparent;")
-        container_layout = QHBoxLayout(container)
-        container_layout.setContentsMargins(4, 2, 4, 2)
-        container_layout.setSpacing(12)
-
-        bubble = QFrame()
-        bubble.setProperty('messageOwn', is_own)
-        bubble_layout = QVBoxLayout(bubble)
-        bubble_layout.setContentsMargins(16, 12, 16, 12)
-        bubble_layout.setSpacing(6)
-
-        if not is_own:
-            sender_label = QLabel(sender)
-            sender_label.setProperty('msgSender', True)
-            bubble_layout.addWidget(sender_label)
-
-        if reply_content:
-            preview = reply_content if len(reply_content) <= 60 else f"{reply_content[:57]}..."
-            reply = QLabel(
-                t(
-                    'main.reply_preview',
-                    'Reply to {sender}: {preview}',
-                    sender=reply_sender or t('common.unknown', 'unknown'),
-                    preview=preview,
-                )
-            )
-            reply.setProperty('msgReply', True)
-            reply.setWordWrap(True)
-            bubble_layout.addWidget(reply)
-
-        body = QLabel(content)
-        body.setWordWrap(True)
-        if self._contains_mention(content):
-            body.setProperty('msgBody', 'mention')
-        else:
-            body.setProperty('msgBody', True)
-        body.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByKeyboard
-            | Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        bubble_layout.addWidget(body)
-
-        reaction_text = self._format_reactions(reactions)
-        if reaction_text:
-            reaction_label = QLabel(reaction_text)
-            reaction_label.setProperty('muted', True)
-            bubble_layout.addWidget(reaction_label)
-
-        time_label = QLabel(timestamp)
-        time_label.setProperty('msgTime', True)
-        time_layout = QVBoxLayout()
-        time_layout.addStretch()
-        time_layout.addWidget(time_label)
-
-        if is_own:
-            container_layout.addStretch()
-            container_layout.addLayout(time_layout)
-            container_layout.addWidget(bubble)
-        else:
-            # 아바타에 동적 색상 적용
-            avatar_key = str(message.get('sender_id') or sender)
-            bg = avatar_color(avatar_key)
-            fg = avatar_text_color(bg)
-            avatar_label = QLabel(sender[0].upper() if sender else "?")
-            avatar_label.setFixedSize(40, 40)
-            avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            avatar_label.setStyleSheet(
-                f"background-color: {bg}; color: {fg}; border-radius: 20px;"
-                " font-weight: bold; font-size: 14pt;"
-            )
-
-            avatar_layout = QVBoxLayout()
-            avatar_layout.addWidget(avatar_label)
-            avatar_layout.addStretch()
-
-            container_layout.addLayout(avatar_layout)
-            container_layout.addWidget(bubble)
-            container_layout.addLayout(time_layout)
-            container_layout.addStretch()
-
-        return container
+        return build_message_container(self, message)
 
     # ── Message index management ────────────────────────────
 
@@ -880,84 +569,16 @@ class MainWindow(QMainWindow):
         self.room_meta.setText(meta)
 
     def _contains_mention(self, content: str) -> bool:
-        lowered = content.lower()
-        for alias in self._user_aliases:
-            token = f"@{alias}".strip().lower()
-            if token and token in lowered:
-                return True
-        return False
+        return contains_mention(self._user_aliases, content)
 
     @staticmethod
     def _format_reactions(reactions: Any) -> str:
-        if not isinstance(reactions, list) or not reactions:
-            return ''
-        chunks = []
-        for reaction in reactions:
-            if not isinstance(reaction, dict):
-                continue
-            emoji = str(reaction.get('emoji') or '').strip()
-            count = int(reaction.get('count') or 0)
-            if not emoji:
-                continue
-            chunks.append(f"{emoji} {count}" if count > 0 else emoji)
-        return '   '.join(chunks)
+        return format_reactions(reactions)
 
     # ── Room list item widget ───────────────────────────────
 
     def _build_room_item_widget(self, room: dict[str, Any]) -> QWidget:
-        name = str(room.get('name') or t('main.room_default_name', 'Room {room_id}', room_id=room.get('id')))
-        preview = str(room.get('last_message_preview') or t('main.no_recent_message', 'No recent message.'))
-        unread = int(room.get('unread_count') or 0)
-        last_time = str(room.get('last_message_time') or '')
-
-        wrapper = QWidget()
-        wrapper_layout = QHBoxLayout(wrapper)
-        wrapper_layout.setContentsMargins(12, 12, 12, 12)
-        wrapper_layout.setSpacing(14)
-
-        # 동적 아바타 색상
-        avatar_key = str(room.get('id') or name)
-        bg = avatar_color(avatar_key)
-        fg = avatar_text_color(bg)
-        avatar_label = QLabel(name[0].upper() if name else "?")
-        avatar_label.setFixedSize(44, 44)
-        avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avatar_label.setStyleSheet(
-            f"background-color: {bg}; color: {fg}; border-radius: 22px;"
-            " font-weight: bold; font-size: 14pt;"
-        )
-
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(2)
-
-        top = QHBoxLayout()
-        title = QLabel(name)
-        title.setStyleSheet("font-size: 11pt; font-weight: 600; color: #1e293b;")
-        top.addWidget(title)
-        top.addStretch()
-
-        if last_time:
-            time_label = QLabel(last_time)
-            time_label.setProperty('muted', True)
-            time_label.setStyleSheet("font-size: 8.5pt; color: #94a3b8;")
-            top.addWidget(time_label)
-
-        if unread > 0:
-            badge = QLabel(str(unread))
-            badge.setProperty('badge', True)
-            top.addWidget(badge)
-
-        preview_label = QLabel(preview)
-        preview_label.setProperty('muted', True)
-        preview_label.setStyleSheet("color: #64748b; font-size: 9.5pt;")
-        preview_label.setFixedHeight(20)
-
-        content_layout.addLayout(top)
-        content_layout.addWidget(preview_label)
-
-        wrapper_layout.addWidget(avatar_label)
-        wrapper_layout.addLayout(content_layout)
-        return wrapper
+        return build_room_item_widget(room)
 
     # ── i18n retranslation ──────────────────────────────────
 
