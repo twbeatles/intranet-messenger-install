@@ -28,7 +28,7 @@
 
 - `.pytest_cache/`
 - all `__pycache__/`
-- `flask_session/`
+- `.session_store/`
 - `server.log`
 - `app/routes (1).py`, `app/sockets (1).py`
 - `app/models/messages (1).py`, `app/models/polls (1).py`, `app/models/users (1).py`
@@ -44,7 +44,7 @@
 
 | Class | Criteria | Examples | Recommended Action |
 |---|---|---|---|
-| Permanent delete | Regenerable runtime/test artifacts | `__pycache__/`, `.pytest_cache/`, `flask_session/`, `server.log`, `tests/*.txt`, `uploads/*token-file*.txt` | Can delete now |
+| Permanent delete | Regenerable runtime/test artifacts | `__pycache__/`, `.pytest_cache/`, `.session_store/`, `server.log`, `tests/*.txt`, `uploads/*token-file*.txt` | Can delete now |
 | Keep short-term | Duplicate sources/assets or historical context docs | `app/routes (1).py`, `templates/index (1).html`, `static/js/messages (1).js`, `claude.md`, `gemini.md` | Keep 1-2 releases then review |
 | Keep always | Cleanup audit and recovery metadata | `MOVED_FILES*.txt`, `MOVED_POST_VERIFY.txt`, this document | Retain |
 

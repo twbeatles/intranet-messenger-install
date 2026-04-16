@@ -16,6 +16,7 @@
     ".venv",
     "build",
     "dist",
+    ".session_store",
     "flask_session",
     "hook-engineio.py",
     "messenger_server.py",

@@ -21,6 +21,8 @@ Standard procedure for building, validating, and shipping `MessengerClient.msi` 
 - EXE spec:
   - server: `messenger.spec`
   - client: `messenger_client.spec`
+  - the server spec keeps `Flask-Session`, `cachelib`, `msgspec`, `ldap3`, and `gevent` hidden imports bundled
+  - the client spec keeps `cryptography` and `keyring` hidden imports bundled
 - WiX definitions:
   - `packaging/wix/MessengerClient.wxs`
   - `packaging/wix/MessengerServer.wxs`
@@ -64,7 +66,8 @@ Standard procedure for building, validating, and shipping `MessengerClient.msi` 
 - clean environment install/uninstall check
 - server:
   - startup works
-  - `GET /api/client/update` response OK (`signature_required`, `artifact_sha256`, `artifact_signature`)
+  - `GET /api/client/update` response OK (`signature_required`, `artifact_sha256`, `artifact_signature`, `signature_alg`)
+  - when signed updates are enforced, verify `DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM` and canary override settings match the release key
 - client:
   - sign in works
   - tray + auto-login restore works
@@ -89,7 +92,7 @@ pytest tests\test_device_sessions_api.py tests\test_client_update_api.py tests\t
 ```
 
 ```powershell
-python -m compileall app client gui
+python -m compileall app client gui tests
 ```
 
 ## Failure Checklist
@@ -109,4 +112,4 @@ python -m compileall app client gui
 | Feature sanity | login/message/file/poll/admin smoke tests pass | [ ] |
 | Auto-login | token refresh after app restart works | [ ] |
 | Code-sign | EXE/MSI signed and hashes recorded | [ ] |
-| Update policy | `/api/client/update` `signature_required` + signature fields applied | [ ] |
+| Update policy | `/api/client/update` `signature_required` + signature fields + public-key settings applied | [ ] |

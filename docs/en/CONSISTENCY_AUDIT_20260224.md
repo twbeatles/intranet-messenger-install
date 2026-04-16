@@ -10,7 +10,7 @@ Note:
 
 - Documents:
   - `README.md`, `README.en.md`
-  - `TRANSITION_CHECKLIST.md`
+  - `docs/CUTOVER_ROLLBACK.md` (replaces the removed `TRANSITION_CHECKLIST.md`)
   - `REAL_MESSENGER_IMPLEMENTATION_REVIEW_20260224.md`
   - `docs/ARCHITECTURE.md`, `docs/API_SOCKET_CONTRACT.md`
   - indexes/contracts/architecture under `docs/ko/*`, `docs/en/*`

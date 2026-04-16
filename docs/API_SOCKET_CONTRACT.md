@@ -82,12 +82,13 @@
   - `download_url`, `release_notes_url`
   - `signature_required` (prod + `REQUIRE_SIGNED_UPDATES_IN_PROD=True`일 때 `true`)
   - 선택 메타: `artifact_sha256`, `artifact_signature`, `signature_alg`
+  - 클라이언트는 `signature_alg=rsa-sha256` 서명을 검증하고, 공개키는 런타임 설정(`DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, canary 별도 키 지원)으로 고정
   - `update_available`, `force_update`
 
 ## 주요 REST API
 
 - 인증: `/api/register`, `/api/login`, `/api/logout`, `/api/me`
-- 엔터프라이즈 인증: `/api/auth/enterprise-login` (`mock` provider 기본 지원)
+- 엔터프라이즈 인증: `/api/auth/enterprise-login` (`mock`, `http_json`, `ldap` provider 지원)
 - 승인 워크플로(스캐폴딩): `/api/admin/users/approve`
 - 사용자: `/api/users`, `/api/users/online`, `/api/profile`
 - 운영 헬스: `/api/system/health`
@@ -125,6 +126,7 @@
 2. 서버 응답: `upload_token`, `file_name`, `file_path`, `file_type`
 3. 클라이언트 소켓 `send_message`에 `upload_token` 전달
 4. 서버가 토큰 검증 후 파일 메시지 저장/중계
+5. 업로드 스캔 활성화 시 provider(`noop`, `http_json`, `clamd`) 정책을 통과해야 최종 저장 허용
 
 ## Socket.IO 이벤트 계약
 

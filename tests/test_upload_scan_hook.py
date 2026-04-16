@@ -52,6 +52,56 @@ def test_upload_scan_noop_allows(client):
     assert response.json.get('upload_token')
 
 
+def test_upload_scan_http_json_allows(client, monkeypatch):
+    import httpx
+
+    class _Response:
+        status_code = 200
+        is_success = True
+
+        @staticmethod
+        def json():
+            return {'clean': True}
+
+    monkeypatch.setattr(httpx, 'post', lambda *args, **kwargs: _Response())
+    _register_and_login(client, 'scan_http_ok')
+    room_id = _create_room(client)
+    client.application.config['UPLOAD_SCAN_ENABLED'] = True
+    client.application.config['UPLOAD_SCAN_PROVIDER'] = 'http_json'
+    client.application.config['UPLOAD_SCAN_HTTP_URL'] = 'https://scanner.example.invalid/scan'
+
+    response = client.post(
+        '/api/upload',
+        data={'room_id': str(room_id), 'file': (io.BytesIO(b'hello'), 'scan-http.txt')},
+        content_type='multipart/form-data',
+    )
+    assert response.status_code == 200
+    assert response.json.get('upload_token')
+
+
+def test_upload_scan_http_json_fail_open_allows_when_backend_unavailable(client, monkeypatch):
+    import httpx
+
+    def _raise_connect_error(*args, **kwargs):
+        raise httpx.ConnectError('scanner down')
+
+    monkeypatch.setattr(httpx, 'post', _raise_connect_error)
+    _register_and_login(client, 'scan_fail_open')
+    room_id = _create_room(client)
+    client.application.config['UPLOAD_SCAN_ENABLED'] = True
+    client.application.config['UPLOAD_SCAN_PROVIDER'] = 'http_json'
+    client.application.config['UPLOAD_SCAN_HTTP_URL'] = 'https://scanner.example.invalid/scan'
+    client.application.config['UPLOAD_SCAN_FAIL_OPEN'] = True
+
+    response = client.post(
+        '/api/upload',
+        data={'room_id': str(room_id), 'file': (io.BytesIO(b'hello'), 'scan-fail-open.txt')},
+        content_type='multipart/form-data',
+    )
+    assert response.status_code == 200
+    assert response.json.get('upload_token')
+
+
 def test_profile_upload_scan_unknown_provider_blocks(client):
     _register_and_login(client, 'scan_profile_block')
     client.application.config['UPLOAD_SCAN_ENABLED'] = True

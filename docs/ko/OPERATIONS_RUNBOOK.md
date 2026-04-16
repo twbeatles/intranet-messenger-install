@@ -23,7 +23,7 @@
 1. 인증 장애
 - `device_sessions` 만료/폐기 상태 확인
 - 서버 시간 동기화(NTP) 확인
-- `flask_session/` 권한/디스크 확인
+- `.session_store/` 권한/디스크 확인
 
 2. 실시간 끊김
 - Socket.IO 연결 상태 확인
@@ -78,9 +78,10 @@
 - `MAINTENANCE_INTERVAL_MINUTES=30`: 정리 작업 주기
 - `RATE_LIMIT_STORAGE_URI=memory://`: 메모리 기반 레이트리밋 저장소
 - `RATE_LIMIT_KEY_MODE=ip`: IP 기준 레이트리밋 키
-- `UPLOAD_SCAN_ENABLED=False`, `UPLOAD_SCAN_PROVIDER=noop`: 업로드 스캔 스캐폴딩 기본 비활성
-- `ENTERPRISE_AUTH_ENABLED=False`, `ENTERPRISE_AUTH_PROVIDER=\"\"`: 엔터프라이즈 인증 기본 비활성 (`mock` provider 지원)
+- `UPLOAD_SCAN_ENABLED=False`, `UPLOAD_SCAN_PROVIDER=noop`: 업로드 스캔 기본 비활성. 지원 provider: `noop`, `http_json`, `clamd`
+- `ENTERPRISE_AUTH_ENABLED=False`, `ENTERPRISE_AUTH_PROVIDER=\"\"`: 엔터프라이즈 인증 기본 비활성. 지원 provider: `mock`, `http_json`, `ldap`
 - `REQUIRE_SIGNED_UPDATES_IN_PROD=True`: prod 환경에서 업데이트 서명 메타 강제
+- `DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, `DESKTOP_CLIENT_CANARY_SIGNING_PUBLIC_KEY_PEM`: 클라이언트 업데이트 서명 검증용 공개키
 
 ## 8) 정기 유지보수 권장 작업
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from client.services.update_signing import verify_signed_update_payload
+
 
 def verify_update_metadata(payload: dict[str, Any]) -> tuple[bool, str]:
     sha = str(payload.get("artifact_sha256") or "").strip()
@@ -20,7 +22,7 @@ def verify_update_metadata(payload: dict[str, Any]) -> tuple[bool, str]:
         return False, "artifact_signature is missing"
     if not alg:
         return False, "signature_alg is missing"
-    return True, ""
+    return verify_signed_update_payload(payload)
 
 
 def should_block_unsigned_update(info: dict[str, Any]) -> tuple[bool, str]:

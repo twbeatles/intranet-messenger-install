@@ -10,6 +10,7 @@ from flask import jsonify, request, session
 
 from app.http.common import emit_profile_updated_event, json_dict
 from app.models import change_password, delete_user, get_user_by_id, safe_file_delete, update_user_profile as model_update_user_profile
+from app.runtime_paths import resolve_upload_path
 from app.security.upload_scanner import scan_saved_file, scan_upload_stream
 from app.utils import sanitize_input, validate_file_header, validate_password
 
@@ -116,7 +117,7 @@ def register_user_routes(app) -> None:
             if success:
                 if old_profile_image:
                     try:
-                        old_image_path = os.path.join(upload_folder, old_profile_image)
+                        old_image_path = resolve_upload_path(old_profile_image)
                         safe_file_delete(old_image_path)
                     except Exception:
                         pass
@@ -134,10 +135,9 @@ def register_user_routes(app) -> None:
             return jsonify({"error": "로그인이 필요합니다."}), 401
 
         user = get_user_by_id(session["user_id"])
-        upload_folder = app.config.get("UPLOAD_FOLDER", UPLOAD_FOLDER)
         if user and user.get("profile_image"):
             try:
-                old_image_path = os.path.join(upload_folder, user["profile_image"])
+                old_image_path = resolve_upload_path(user["profile_image"])
                 safe_file_delete(old_image_path)
             except Exception:
                 pass

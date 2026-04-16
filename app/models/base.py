@@ -12,13 +12,15 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Iterator, cast
 
+from app.runtime_paths import resolve_upload_path
+
 # config 임포트 (PyInstaller 호환)
 try:
-    from config import DATABASE_PATH, UPLOAD_FOLDER, MAINTENANCE_INTERVAL_MINUTES
+    from config import DATABASE_PATH, MAINTENANCE_INTERVAL_MINUTES
 except ImportError:
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    from config import DATABASE_PATH, UPLOAD_FOLDER, MAINTENANCE_INTERVAL_MINUTES
+    from config import DATABASE_PATH, MAINTENANCE_INTERVAL_MINUTES
 
 logger = logging.getLogger(__name__)
 
@@ -762,7 +764,7 @@ def cleanup_empty_rooms():
             cursor.execute('SELECT file_path FROM room_files WHERE room_id = ?', (room_id,))
             files = cursor.fetchall()
             for f in files:
-                full_path = os.path.join(UPLOAD_FOLDER, f['file_path'])
+                full_path = resolve_upload_path(f['file_path'])
                 safe_file_delete(full_path)
             
             cursor.execute('DELETE FROM messages WHERE room_id = ?', (room_id,))

@@ -27,7 +27,7 @@ Keep existing features/business logic while removing browser dependency and movi
 3. Storage
 - DB: `messenger.db` (SQLite)
 - Uploads: `uploads/`
-- Server-side sessions: `flask_session/`
+- Server-side sessions: `.session_store/`
 
 ## Server Layers
 

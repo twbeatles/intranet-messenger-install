@@ -17,5 +17,5 @@
 
 - Python `3.11` 권장 (`.github/workflows/ci.yml`, `pyrightconfig.json`)
 - 정적 분석: `pyright`
-- 런타임 검증: `pytest tests -q`, `python -m compileall app client gui`
+- 런타임 검증: `pytest tests -q`, `python -m compileall app client gui tests`
 - 인코딩/에디터 기본값: `.editorconfig`, `.vscode/settings.json` (UTF-8)

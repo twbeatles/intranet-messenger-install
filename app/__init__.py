@@ -35,7 +35,11 @@ if not _SKIP_GEVENT and not _GEVENT_ALREADY_PATCHED:
         _GEVENT_AVAILABLE = False
 
 from flask import Flask
-from flask_session import Session
+
+try:
+    from flask_session import Session
+except Exception:  # pragma: no cover
+    Session = None
 
 from app.bootstrap.config_runtime import apply_runtime_config, load_runtime_config
 from app.bootstrap.logging_setup import configure_logging
@@ -43,6 +47,7 @@ from app.bootstrap.security_headers import install_security_headers
 from app.bootstrap.session_guard import install_session_guard
 from app.bootstrap.socketio_factory import create_socketio
 from app.extensions import compress, csrf, limiter
+from app.runtime_paths import get_session_store_dir
 
 try:
     from cachelib.file import FileSystemCache
@@ -134,16 +139,19 @@ def create_app():
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=SESSION_TIMEOUT_HOURS)
     apply_runtime_config(app, runtime, logger)
 
-    session_dir = os.path.join(BASE_DIR, "flask_session")
-    os.makedirs(session_dir, exist_ok=True)
-    app.config["SESSION_TYPE"] = "cachelib"
     app.config["SESSION_PERMANENT"] = True
-    if FileSystemCache is not None:
-        app.config["SESSION_CACHELIB"] = FileSystemCache(cache_dir=session_dir, threshold=5000, default_timeout=0)
+    if Session is not None:
+        session_dir = get_session_store_dir(base_dir=BASE_DIR)
+        os.makedirs(session_dir, exist_ok=True)
+        app.config["SESSION_TYPE"] = "cachelib"
+        if FileSystemCache is not None:
+            app.config["SESSION_CACHELIB"] = FileSystemCache(cache_dir=session_dir, threshold=5000, default_timeout=0)
+        else:  # pragma: no cover
+            app.config["SESSION_TYPE"] = "filesystem"
+            app.config["SESSION_FILE_DIR"] = session_dir
+        Session(app)
     else:  # pragma: no cover
-        app.config["SESSION_TYPE"] = "filesystem"
-        app.config["SESSION_FILE_DIR"] = session_dir
-    Session(app)
+        logger.warning("Flask-Session is unavailable; falling back to signed cookie sessions.")
 
     socketio = create_socketio(app, gevent_available=_GEVENT_AVAILABLE, logger=logger)
 

@@ -22,7 +22,9 @@ python -m client.main --server-url http://127.0.0.1:5000
 
 - 데스크톱 클라이언트: 트레이 상주, 자동 실행, 세션 복원, 동적 아바타 및 향상된 사용자 테마 지원
 - 보안: 메시지 암호화(v2) + v1 복호화 호환 (서버 신뢰형 키 중계 모델)
+- 보안 강화: 서명된 업데이트 검증(`rsa-sha256`), 업로드 경로 중앙화, 업로드 스캔 provider(`noop`, `http_json`, `clamd`)
 - 인증: `device_sessions` 기반 토큰 발급/회전/폐기
+- 엔터프라이즈 인증: runtime 설정 기반 `mock`, `http_json`, `ldap` provider 지원
 - 운영: `GET /api/system/health` 및 정책 스위치 기반 운영 가시성
 - 서버 응답 i18n 호환: `error` 유지 + `error_code`/`error_localized` 추가
 - 웹 클라이언트: 유지보수 목적 i18n 지원(디자인 전면 개편 대상 아님)
@@ -33,8 +35,8 @@ python -m client.main --server-url http://127.0.0.1:5000
 - 한국어 문서 인덱스: `docs/ko/README.md`
 - 영어 문서 인덱스: `docs/en/README.md`
 - 정합성 점검 보고서(KO/EN): `docs/ko/CONSISTENCY_AUDIT_20260224.md`, `docs/en/CONSISTENCY_AUDIT_20260224.md`
-- 구현 리스크/로드맵: `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`
-- 기능 구현 리스크 점검/개선 계획: `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
+- 기능 구현 점검/개선 이력: `IMPLEMENTATION_FUNCTIONAL_AUDIT_20260416.md`
+- 운영 전환/복구 기준: `docs/CUTOVER_ROLLBACK.md`, `docs/OPERATIONS_RUNBOOK.md`
 - 루트 빌드/배포 가이드: `BUILD_DEPLOY_GUIDE.md`
 - 세션 가이드: `claude.md`, `gemini.md`
 
@@ -64,5 +66,5 @@ docs/                ko/en documentation
 ```powershell
 pyright
 pytest tests -q
-python -m compileall app client gui
+python -m compileall app client gui tests
 ```

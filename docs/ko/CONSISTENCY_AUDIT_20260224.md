@@ -10,7 +10,7 @@
 
 - 문서:
   - `README.md`, `README.en.md`
-  - `TRANSITION_CHECKLIST.md`
+  - `docs/CUTOVER_ROLLBACK.md` (`TRANSITION_CHECKLIST.md` 대체)
   - `REAL_MESSENGER_IMPLEMENTATION_REVIEW_20260224.md`
   - `docs/ARCHITECTURE.md`, `docs/API_SOCKET_CONTRACT.md`
   - `docs/ko/*`, `docs/en/*` 인덱스/계약/아키텍처 문서

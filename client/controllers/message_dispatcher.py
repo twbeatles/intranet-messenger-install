@@ -11,8 +11,80 @@ from client.i18n import t
 
 
 class MessageDispatcher:
+    FILE_TOKEN_REFRESH_WINDOW_SECONDS = 240.0
+
     def __init__(self, controller) -> None:
         self.controller = controller
+
+    @staticmethod
+    def _is_file_payload(payload: dict[str, Any]) -> bool:
+        return str(payload.get("type") or "").strip().lower() in ("file", "image")
+
+    @staticmethod
+    def _sanitize_socket_payload(payload: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in payload.items() if not str(key).startswith("_")}
+
+    def _mark_entry_failed(self, client_msg_id: str, entry: dict[str, Any], message: str = "") -> None:
+        entry["failed"] = True
+        self.upsert_outbox_entry(client_msg_id, entry)
+        if client_msg_id not in self.controller._failed_send_ids:
+            self.controller._failed_send_ids.append(client_msg_id)
+        if message:
+            self.controller.main_window.show_error(message)
+        self.refresh_delivery_state()
+
+    def _refresh_file_upload_token(self, client_msg_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
+        payload = dict(entry.get("payload") or {})
+        local_path = str(payload.get("_local_path") or "").strip()
+        room_id = int(payload.get("room_id") or 0)
+        if not local_path or room_id <= 0:
+            self._mark_entry_failed(
+                client_msg_id,
+                entry,
+                t("files.local_not_found", "File not found."),
+            )
+            return None
+
+        try:
+            upload = self.controller.api.upload_file(room_id, local_path)
+        except Exception as exc:
+            self._mark_entry_failed(client_msg_id, entry, str(exc))
+            return None
+
+        token = str(upload.get("upload_token") or "").strip()
+        file_name = str(upload.get("file_name") or payload.get("content") or "").strip()
+        message_type = self.guess_message_type(file_name, upload.get("file_type"))
+        if not token:
+            self._mark_entry_failed(
+                client_msg_id,
+                entry,
+                t("controller.upload_token_missing", "Upload token is missing."),
+            )
+            return None
+
+        payload["upload_token"] = token
+        payload["_upload_token_issued_at"] = time.time()
+        payload["content"] = file_name
+        payload["type"] = message_type
+        entry["payload"] = payload
+        entry["is_file"] = True
+        entry["file_name"] = file_name
+        self.upsert_outbox_entry(client_msg_id, entry)
+        return payload
+
+    def _prepare_payload_for_dispatch(self, client_msg_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
+        payload = dict(entry.get("payload") or {})
+        if not self._is_file_payload(payload):
+            return self._sanitize_socket_payload(payload)
+
+        token = str(payload.get("upload_token") or "").strip()
+        token_issued_at = float(payload.get("_upload_token_issued_at") or 0.0)
+        age_seconds = time.time() - token_issued_at if token_issued_at > 0 else self.FILE_TOKEN_REFRESH_WINDOW_SECONDS
+        if not token or age_seconds >= self.FILE_TOKEN_REFRESH_WINDOW_SECONDS:
+            payload = self._refresh_file_upload_token(client_msg_id, entry)
+            if payload is None:
+                return None
+        return self._sanitize_socket_payload(payload)
 
     def upsert_outbox_entry(self, client_msg_id: str, entry: dict[str, Any]) -> None:
         if not self.controller.current_user:
@@ -76,7 +148,9 @@ class MessageDispatcher:
         entry["last_attempt_at"] = time.time()
         entry["failed"] = False
         self.upsert_outbox_entry(client_msg_id, entry)
-        payload = dict(entry.get("payload") or {})
+        payload = self._prepare_payload_for_dispatch(client_msg_id, entry)
+        if payload is None:
+            return
 
         def ack_callback(raw_ack: dict[str, Any] | Any) -> None:
             ack = raw_ack if isinstance(raw_ack, dict) else {}
@@ -106,6 +180,11 @@ class MessageDispatcher:
             self.refresh_delivery_state()
             return
 
+        if bool(entry.get("is_file")):
+            payload = dict(entry.get("payload") or {})
+            payload.pop("upload_token", None)
+            payload["_upload_token_issued_at"] = 0.0
+            entry["payload"] = payload
         entry["failed"] = True
         self.upsert_outbox_entry(client_msg_id, entry)
         if client_msg_id not in self.controller._failed_send_ids:

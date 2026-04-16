@@ -48,6 +48,7 @@ hiddenimports = sorted(
             "keyring.backends",
             "keyring.backends.Windows",
             "keyring.backends.null",
+            "cryptography",
             "Crypto",
             "Crypto.Cipher.AES",
             "Crypto.Util.Padding",

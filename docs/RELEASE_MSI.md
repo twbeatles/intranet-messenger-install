@@ -19,6 +19,8 @@
 - EXE spec:
   - 서버: `messenger.spec`
   - 클라이언트: `messenger_client.spec`
+  - server spec는 `Flask-Session`, `cachelib`, `msgspec`, `ldap3`, `gevent` 계열 hidden import를 포함
+  - client spec는 `cryptography`, `keyring` 계열 hidden import를 포함
 - WiX 정의:
   - `packaging/wix/MessengerClient.wxs`
   - `packaging/wix/MessengerServer.wxs`
@@ -63,7 +65,8 @@
 - 클린 환경에서 설치/삭제 정상 동작 확인
 - 서버:
   - 기동 가능 여부
-  - `GET /api/client/update` 응답 확인 (`signature_required`, `artifact_sha256`, `artifact_signature`)
+  - `GET /api/client/update` 응답 확인 (`signature_required`, `artifact_sha256`, `artifact_signature`, `signature_alg`)
+  - 서명 강제 환경이면 `DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, `DESKTOP_CLIENT_CANARY_SIGNING_PUBLIC_KEY_PEM` 값 점검
 - 클라이언트:
   - 로그인 가능 여부
   - 트레이 실행/자동 로그인 복원 확인
@@ -88,7 +91,7 @@ pytest tests\test_device_sessions_api.py tests\test_client_update_api.py tests\t
 ```
 
 ```powershell
-python -m compileall app client gui
+python -m compileall app client gui tests
 ```
 
 ## 실패 시 점검 포인트
@@ -108,4 +111,4 @@ python -m compileall app client gui
 | 기능 검증 | 로그인/메시지/파일/투표/관리자 확인 | [ ] |
 | 자동로그인 검증 | 앱 재시작 후 토큰 refresh | [ ] |
 | 코드서명 | EXE/MSI 서명 및 해시 기록 | [ ] |
-| 배포 정책 반영 | `/api/client/update`의 `signature_required`/서명 필드 반영 | [ ] |
+| 배포 정책 반영 | `/api/client/update`의 `signature_required`/서명 필드 + 공개키 설정 반영 | [ ] |

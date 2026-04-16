@@ -2309,6 +2309,9 @@ class ServerWindow(QMainWindow):
 # 메인 실행
 # ============================================================================
 if __name__ == '__main__':
+    raise SystemExit(
+        "messenger_server.py is a legacy entrypoint. Use 'python server.py --cli' for the maintained server runtime."
+    )
     # PyQt6 GUI 모드
     qt_app = QApplication(sys.argv)
     qt_app.setQuitOnLastWindowClosed(False)  # 트레이 아이콘으로 계속 실행

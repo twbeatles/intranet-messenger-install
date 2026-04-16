@@ -26,6 +26,52 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
 
 
+def _build_device_session_values(
+    *,
+    user_id: int,
+    device_name: str,
+    ip: str,
+    user_agent: str,
+    ttl_days: int,
+    remember: bool,
+    device_id: str | None,
+) -> tuple[str, str, str, str, tuple[Any, ...]]:
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = _hash_token(raw_token)
+    now = _now_utc()
+    normalized_ttl_days = max(1, int(ttl_days))
+    expires_at = now + timedelta(days=normalized_ttl_days)
+    normalized_device_id = (device_id or uuid.uuid4().hex).strip()[:64]
+    normalized_name = (device_name or 'Desktop').strip()[:120]
+    values = (
+        int(user_id),
+        normalized_device_id,
+        token_hash,
+        normalized_name,
+        _fmt_ts(now),
+        _fmt_ts(now),
+        _fmt_ts(expires_at),
+        (ip or '')[:64],
+        (user_agent or '')[:500],
+        1 if remember else 0,
+        normalized_ttl_days,
+    )
+    return raw_token, normalized_device_id, _fmt_ts(expires_at), normalized_name, values
+
+
+def _insert_device_session_row(cursor, values: tuple[Any, ...]) -> int:
+    cursor.execute(
+        '''
+        INSERT INTO device_sessions (
+            user_id, device_id, token_hash, device_name, created_at,
+            last_used_at, expires_at, revoked_at, ip, user_agent, remember, ttl_days
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+        ''',
+        values,
+    )
+    return int(cursor.lastrowid or 0)
+
+
 def issue_device_session(
     user_id: int,
     device_name: str,
@@ -39,42 +85,23 @@ def issue_device_session(
     conn = get_db()
     cursor = conn.cursor()
 
-    raw_token = secrets.token_urlsafe(48)
-    token_hash = _hash_token(raw_token)
-    now = _now_utc()
-    expires_at = now + timedelta(days=max(1, int(ttl_days)))
-    normalized_device_id = (device_id or uuid.uuid4().hex).strip()[:64]
-    normalized_name = (device_name or 'Desktop').strip()[:120]
-
-    cursor.execute(
-        '''
-        INSERT INTO device_sessions (
-            user_id, device_id, token_hash, device_name, created_at,
-            last_used_at, expires_at, revoked_at, ip, user_agent, remember, ttl_days
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
-        ''',
-        (
-            user_id,
-            normalized_device_id,
-            token_hash,
-            normalized_name,
-            _fmt_ts(now),
-            _fmt_ts(now),
-            _fmt_ts(expires_at),
-            (ip or '')[:64],
-            (user_agent or '')[:500],
-            1 if remember else 0,
-            max(1, int(ttl_days)),
-        ),
+    raw_token, normalized_device_id, expires_at, _normalized_name, values = _build_device_session_values(
+        user_id=int(user_id),
+        device_name=device_name,
+        ip=ip,
+        user_agent=user_agent,
+        ttl_days=ttl_days,
+        remember=remember,
+        device_id=device_id,
     )
-    session_id = cursor.lastrowid
+    session_id = _insert_device_session_row(cursor, values)
     conn.commit()
 
     return {
         'device_token': raw_token,
         'session_id': session_id,
         'device_id': normalized_device_id,
-        'expires_at': _fmt_ts(expires_at),
+        'expires_at': expires_at,
         'remember': bool(remember),
         'ttl_days': max(1, int(ttl_days)),
     }
@@ -162,28 +189,76 @@ def rotate_device_session_token(
     user_agent: str = '',
     ttl_days: int = 30,
 ) -> dict[str, Any] | None:
-    """Rotate token: revoke old one immediately and issue a new one."""
-    current = get_device_session_by_token(token)
-    if not current:
+    """Rotate token atomically so refresh failures do not strand the current session."""
+    if not token:
         return None
 
-    # Revoke old token first.
-    if not revoke_device_session_by_token(token):
-        return None
+    conn = get_db()
+    cursor = conn.cursor()
+    token_hash = _hash_token(token)
+    now = _fmt_ts(_now_utc())
 
-    issued = issue_device_session(
-        user_id=current['user_id'],
-        device_name=current.get('device_name') or 'Desktop',
-        ip=ip,
-        user_agent=user_agent,
-        ttl_days=int(current.get('ttl_days') or ttl_days or 30),
-        remember=bool(current.get('remember', 1)),
-        device_id=current.get('device_id'),
-    )
-    return {
-        **issued,
-        'user_id': current['user_id'],
-    }
+    try:
+        conn.execute('BEGIN IMMEDIATE')
+    except Exception:
+        pass
+
+    try:
+        cursor.execute(
+            '''
+            SELECT *
+            FROM device_sessions
+            WHERE token_hash = ?
+              AND revoked_at IS NULL
+              AND expires_at > ?
+            LIMIT 1
+            ''',
+            (token_hash, now),
+        )
+        current = cursor.fetchone()
+        if not current:
+            conn.rollback()
+            return None
+
+        current_dict = dict(current)
+        raw_token, normalized_device_id, expires_at, _normalized_name, values = _build_device_session_values(
+            user_id=int(current_dict['user_id']),
+            device_name=str(current_dict.get('device_name') or 'Desktop'),
+            ip=ip,
+            user_agent=user_agent,
+            ttl_days=int(current_dict.get('ttl_days') or ttl_days or 30),
+            remember=bool(current_dict.get('remember', 1)),
+            device_id=str(current_dict.get('device_id') or ''),
+        )
+        session_id = _insert_device_session_row(cursor, values)
+        cursor.execute(
+            '''
+            UPDATE device_sessions
+            SET revoked_at = ?
+            WHERE id = ?
+              AND revoked_at IS NULL
+            ''',
+            (_fmt_ts(_now_utc()), int(current_dict['id'])),
+        )
+        if int(cursor.rowcount or 0) < 1:
+            conn.rollback()
+            return None
+        conn.commit()
+        return {
+            'device_token': raw_token,
+            'session_id': session_id,
+            'device_id': normalized_device_id,
+            'expires_at': expires_at,
+            'remember': bool(current_dict.get('remember', 1)),
+            'ttl_days': int(current_dict.get('ttl_days') or ttl_days or 30),
+            'user_id': int(current_dict['user_id']),
+        }
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
 
 
 def list_active_device_sessions(user_id: int, *, include_expired: bool = False) -> list[dict[str, Any]]:

@@ -82,12 +82,13 @@
   - `download_url`, `release_notes_url`
   - `signature_required` (`true` when prod + `REQUIRE_SIGNED_UPDATES_IN_PROD=True`)
   - optional metadata: `artifact_sha256`, `artifact_signature`, `signature_alg`
+  - the desktop client verifies `signature_alg=rsa-sha256` against pinned runtime public keys (`DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, with an optional canary override)
   - `update_available`, `force_update`
 
 ## Main REST APIs
 
 - Auth: `/api/register`, `/api/login`, `/api/logout`, `/api/me`
-- Enterprise auth: `/api/auth/enterprise-login` (built-in `mock` provider)
+- Enterprise auth: `/api/auth/enterprise-login` (supports `mock`, `http_json`, `ldap`)
 - Approval workflow (scaffold): `/api/admin/users/approve`
 - Users: `/api/users`, `/api/users/online`, `/api/profile`
 - Ops health: `/api/system/health`
@@ -125,6 +126,7 @@
 2. Server returns `upload_token`, `file_name`, `file_path`, `file_type`
 3. Client sends socket `send_message` with `upload_token`
 4. Server validates token and stores/broadcasts file message
+5. When upload scanning is enabled, the provider policy (`noop`, `http_json`, `clamd`) must allow the upload before final persistence
 
 ## Socket.IO Event Contract
 

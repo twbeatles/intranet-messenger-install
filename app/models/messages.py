@@ -3,22 +3,16 @@
 메시지 관리 모듈
 """
 
-import logging
-import threading
 import os
+import logging
 import re
 import sqlite3
+import threading
 import time
 from datetime import datetime, timezone, timedelta
 
 from app.models.base import get_db, safe_file_delete
-
-try:
-    from config import UPLOAD_FOLDER
-except ImportError:
-    import sys
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    from config import UPLOAD_FOLDER
+from app.runtime_paths import resolve_upload_path
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +247,7 @@ def create_file_message_with_record(
     normalized_client_msg_id = _normalize_client_msg_id(client_msg_id)
     conn = get_db()
     cursor = conn.cursor()
-    full_path = os.path.join(UPLOAD_FOLDER, file_path)
+    full_path = resolve_upload_path(file_path)
     try:
         message_id = _insert_message_row(
             cursor,
@@ -437,7 +431,7 @@ def delete_message(message_id, user_id):
         conn.commit()
         
         if msg['file_path']:
-            full_path = os.path.join(UPLOAD_FOLDER, msg['file_path'])
+            full_path = resolve_upload_path(msg['file_path'])
             safe_file_delete(full_path)
         
         return True, msg['room_id']

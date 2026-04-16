@@ -27,7 +27,7 @@
 3. 저장소/파일
 - DB: `messenger.db` (SQLite)
 - 파일 저장: `uploads/`
-- 세션 파일: `flask_session/` (서버사이드 세션)
+- 세션 파일: `.session_store/` (서버사이드 세션)
 
 ## 서버 계층
 

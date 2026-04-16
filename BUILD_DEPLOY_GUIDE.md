@@ -55,6 +55,10 @@ wix --version
 - 클라이언트: `messenger_client.spec`
 
 spec 정합성 메모:
+- `messenger.spec`는 `Flask-Session`, `cachelib`, `msgspec`, `ldap3`, `gevent` 계열 hidden import를 포함해 동적 로딩 누락을 방지합니다.
+- `messenger_client.spec`는 `cryptography`, `keyring` 계열 hidden import를 포함해 업데이트 서명 검증과 자격 증명 저장소가 누락되지 않도록 합니다.
+
+spec 정합성 메모:
 - `messenger.spec`는 `server.py` 엔트리와 `app/**`, `gui/**`, `static/`, `templates/`, `i18n/`, `certs/`를 포함합니다.
   - `collect_submodules("app")`, `collect_submodules("gui")`를 사용하므로 `app/bootstrap/*`, `app/http/*`, `app/realtime/*`, `gui/server_process.py` 같은 분할 모듈도 자동 포함됩니다.
   - `static/` 전체를 데이터로 포함하므로 `static/css/style.css` manifest, 분할 CSS, `static/js/modules/main.js` 브리지 엔트리도 함께 패키징됩니다.
@@ -79,7 +83,8 @@ WiX 정의 파일:
 1. 서버 먼저 배포
 - `MessengerServer.msi` 설치
 - 서버 기동 확인
-- `GET /api/client/update` 응답 확인 (`signature_required`, `artifact_sha256`, `artifact_signature` 필드 점검)
+- `GET /api/client/update` 응답 확인 (`signature_required`, `artifact_sha256`, `artifact_signature`, `signature_alg` 필드 점검)
+- 서명 강제 환경이면 `DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, `DESKTOP_CLIENT_CANARY_SIGNING_PUBLIC_KEY_PEM` 값이 실제 배포 키와 일치하는지 점검
 
 2. 클라이언트 배포
 - `MessengerClient.msi` 전사 배포 (수동/배포도구)
@@ -109,14 +114,14 @@ WiX 정의 파일:
 ```
 
 운영(prod)에서는 `REQUIRE_SIGNED_UPDATES_IN_PROD=True` 상태를 유지하고,
-`/api/client/update`에 서명 메타데이터가 내려오는지 반드시 확인합니다.
+`/api/client/update`에 서명 메타데이터가 내려오며 공개키 설정(`DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, canary 별도 키 포함)이 실제 배포 키와 일치하는지 반드시 확인합니다.
 
 ## 6) 배포 전 검증 체크
 
 ```powershell
 pyright
 pytest tests -q
-python -m compileall app client gui
+python -m compileall app client gui tests
 ```
 
 인코딩 기준:

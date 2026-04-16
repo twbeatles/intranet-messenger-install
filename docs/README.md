@@ -33,5 +33,5 @@
 
 - Python `3.11` recommended (`.github/workflows/ci.yml`, `pyrightconfig.json`)
 - Static analysis: `pyright`
-- Runtime validation: `pytest tests -q`, `python -m compileall app client gui`
+- Runtime validation: `pytest tests -q`, `python -m compileall app client gui tests`
 - Encoding/editor defaults: `.editorconfig`, `.vscode/settings.json` (UTF-8)

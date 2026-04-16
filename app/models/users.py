@@ -9,6 +9,7 @@ import threading
 import time
 
 from app.models.base import get_db, close_thread_db
+from app.runtime_paths import resolve_upload_path
 from app.utils import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
@@ -411,14 +412,6 @@ def get_user_session_token(user_id):
 
 def delete_user(user_id, password):
     """회원 탈퇴"""
-    import os
-    try:
-        from config import UPLOAD_FOLDER
-    except ImportError:
-        import sys
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        from config import UPLOAD_FOLDER
-    
     from app.models.base import safe_file_delete
     
     conn = get_db()
@@ -435,7 +428,7 @@ def delete_user(user_id, password):
         # 프로필 이미지 삭제
         if user['profile_image']:
             try:
-                profile_path = os.path.join(UPLOAD_FOLDER, user['profile_image'])
+                profile_path = resolve_upload_path(user['profile_image'])
                 safe_file_delete(profile_path)
             except Exception as e:
                 logger.warning(f"Profile image deletion failed: {e}")
@@ -465,7 +458,7 @@ def delete_user(user_id, password):
         files_to_delete = cursor.fetchall()
         for f in files_to_delete:
             try:
-                full_path = os.path.join(UPLOAD_FOLDER, f['file_path'])
+                full_path = resolve_upload_path(f['file_path'])
                 safe_file_delete(full_path)
             except Exception as e:
                 logger.warning(f"File deletion failed during user delete: {e}")

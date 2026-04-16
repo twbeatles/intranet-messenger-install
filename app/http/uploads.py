@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import jsonify, request, send_from_directory, session
 from werkzeug.utils import secure_filename
 
-from app.http.common import json_dict
+from app.http.common import emit_socket_event, json_dict
 from app.models import delete_room_file, get_db, get_room_files, is_room_admin, is_room_member, safe_file_delete
 from app.security.upload_scanner import scan_saved_file, scan_upload_stream
 from app.upload_tokens import issue_upload_token
@@ -168,7 +168,25 @@ def register_upload_routes(app) -> None:
         if not is_room_member(room_id, session["user_id"]):
             return jsonify({"error": "접근 권한이 없습니다."}), 403
         is_admin = is_room_admin(room_id, session["user_id"])
-        success, _file_path = delete_room_file(file_id, session["user_id"], room_id=room_id, is_admin=is_admin)
+        success, deleted_info = delete_room_file(
+            file_id,
+            session["user_id"],
+            room_id=room_id,
+            is_admin=is_admin,
+        )
         if success:
-            return jsonify({"success": True})
+            payload = deleted_info if isinstance(deleted_info, dict) else {}
+            message_id = int(payload.get("message_id") or 0)
+            if message_id > 0:
+                emit_socket_event(
+                    "message_deleted",
+                    {"room_id": room_id, "message_id": message_id},
+                    room_id=room_id,
+                )
+            emit_socket_event(
+                "room_updated",
+                {"room_id": room_id, "action": "file_deleted", "by_user_id": int(session["user_id"])},
+                room_id=room_id,
+            )
+            return jsonify({"success": True, **payload})
         return jsonify({"error": "파일 삭제 권한이 없습니다."}), 403

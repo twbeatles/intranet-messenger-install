@@ -22,7 +22,9 @@ Python `3.11` is the recommended verification baseline. Static analysis and edit
 
 - Desktop client: tray mode, startup option, session restore, dynamic avatars, and enhanced user theme
 - Security: message encryption (v2) + v1 decrypt compatibility (server-trust key relay model)
+- Security hardening: signed update verification (`rsa-sha256`), centralized upload-path resolution, and optional upload scanning providers (`noop`, `http_json`, `clamd`)
 - Authentication: `device_sessions` issue/rotate/revoke flow
+- Enterprise auth: optional `mock`, `http_json`, and `ldap` providers wired through runtime config
 - Operations: `GET /api/system/health` and policy-switch driven observability
 - Server i18n compatibility: keep `error`, add `error_code`/`error_localized`
 - Web client: i18n-focused maintenance scope (not a full design rewrite)
@@ -33,8 +35,8 @@ Python `3.11` is the recommended verification baseline. Static analysis and edit
 - Korean docs index: `docs/ko/README.md`
 - English docs index: `docs/en/README.md`
 - Consistency audit (KO/EN): `docs/ko/CONSISTENCY_AUDIT_20260224.md`, `docs/en/CONSISTENCY_AUDIT_20260224.md`
-- Implementation risk/roadmap: `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`
-- Feature risk review / implementation batch plan: `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
+- Implementation audit / remediation log: `IMPLEMENTATION_FUNCTIONAL_AUDIT_20260416.md`
+- Cutover and rollback references: `docs/CUTOVER_ROLLBACK.md`, `docs/OPERATIONS_RUNBOOK.md`
 - Root build/deploy guide: `BUILD_DEPLOY_GUIDE.md`
 - Session guides: `claude.md`, `gemini.md`
 
@@ -64,5 +66,5 @@ Compatibility entry points remain stable. `app/routes.py`, `app/sockets.py`, `cl
 ```powershell
 pyright
 pytest tests -q
-python -m compileall app client gui
+python -m compileall app client gui tests
 ```

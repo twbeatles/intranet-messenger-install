@@ -1,7 +1,7 @@
 # GEMINI.md
 
 프로젝트: `intranet-messenger-main-install`  
-최종 업데이트: 2026-03-18
+최종 업데이트: 2026-04-16
 
 ## 1) 이 문서의 역할
 
@@ -11,9 +11,9 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 
 1. `README.md`
 2. `README.en.md`
-3. `TRANSITION_CHECKLIST.md` (deprecated, 대체: `docs/CUTOVER_ROLLBACK.md`, `docs/OPERATIONS_RUNBOOK.md`)
-4. `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`
-5. `IMPLEMENTATION_FEATURE_RISK_REVIEW_20260305.md`
+3. `docs/CUTOVER_ROLLBACK.md`
+4. `docs/OPERATIONS_RUNBOOK.md`
+5. `IMPLEMENTATION_FUNCTIONAL_AUDIT_20260416.md`
 6. `docs/README.md` (`docs/ko`, `docs/en` 인덱스)
 7. 작업 대상 코드 파일
    - 서버: `app/__init__.py`, `app/routes.py`, `app/sockets.py`, `app/bootstrap/*`, `app/http/*`, `app/realtime/*`
@@ -23,9 +23,9 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 ### 리스크 수용 메모 (R1)
 
 - 현재 저장소에서는 `IMPLEMENTATION_RISK_AUDIT_20260224.md`, `IMPLEMENTATION_RISK_AUDIT_20260225.md`가 삭제 상태일 수 있음.
-- 본 세션 기준 정책: **복구하지 않고 삭제 상태를 유지**하며, 대체 기준 문서로 `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`를 사용.
+- 본 세션 기준 정책: **복구하지 않고 삭제 상태를 유지**하며, 대체 기준 문서로 `IMPLEMENTATION_FUNCTIONAL_AUDIT_20260416.md`를 사용.
 
-## 3) 프로젝트 스냅샷 (2026-03-18 기준)
+## 3) 프로젝트 스냅샷 (2026-04-16 기준)
 
 - 제품: 사내 메신저 Desktop-First 전환
 - 서버: `Flask + Socket.IO + SQLite`
@@ -40,6 +40,10 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
   - `python -m compileall app client gui` -> 성공
   - `pytest --collect-only -q` -> `177 tests collected`
   - `pytest tests -q` -> `177 passed`
+- 테스트 기준(2026-04-16):
+  - `pyright` -> `0 errors, 0 warnings`
+  - `python -m compileall app client gui tests` -> 성공
+  - `pytest tests -q` -> `187 passed`
 - 정적 분석/에디터 기준:
   - `pyrightconfig.json` (`typeCheckingMode: standard`, Python `3.11`)
   - `.editorconfig`, `.vscode/settings.json` (UTF-8 / workspace Pylance baseline)
@@ -90,7 +94,7 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 3. 최소 범위 수정(기능 계약 우선)
 4. 아래 검증을 순서대로 실행:
    - `pyright`
-   - `python -m compileall app client gui`
+   - `python -m compileall app client gui tests`
    - `pytest tests -q`
    - `pytest --maxfail=1`
 5. 결과를 다음 포맷으로 보고:
@@ -101,11 +105,11 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 
 ## 6) 현재 우선 점검 대상 (Open Items)
 
-`OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md` 기준:
+`IMPLEMENTATION_FUNCTIONAL_AUDIT_20260416.md` 기준:
 
-1. `ENTERPRISE_AUTH_PROVIDER` 실제 연동(AD/LDAP/SSO) 구현
-2. `UPLOAD_SCAN_PROVIDER` 실스캐너 연동 및 운영 정책 보정
-3. 업데이트 서명/해시 검증 강제 정책(배포 파이프라인 포함) 확정
+1. `ENTERPRISE_AUTH_PROVIDER` 운영 환경 실설정(HTTP/LDAP 엔드포인트, 타임아웃, 헤더) 검증
+2. `UPLOAD_SCAN_PROVIDER` 운영 환경 실설정(HTTP/ClamAV, fail-open 정책, 백엔드 SLA) 검증
+3. 업데이트 서명 공개키 운영값과 배포 체크리스트 정합성 검증
 4. SQLite -> 서버형 RDBMS/외부 MQ 전환 리허설 구체화
 5. DR 리허설 정례화 및 장애주입 시나리오 확대
 
@@ -125,12 +129,12 @@ Gemini 기반 새 작업 세션이 시작될 때, 현재 프로젝트의 운영 
 ## 8) Gemini 시작 프롬프트 템플릿
 
 ```text
-Read `gemini.md`, `README.md`, and `OFFLINE_MESSENGER_IMPLEMENTATION_RISK_ROADMAP_20260226.md`.
+Read `gemini.md`, `README.md`, and `IMPLEMENTATION_FUNCTIONAL_AUDIT_20260416.md`.
 Before editing, provide:
 1) baseline summary,
 2) non-negotiable contracts in this scope,
 3) exact files to modify.
 Then implement and verify with:
-`pyright`, `python -m compileall app client gui`, `pytest tests -q`, `pytest --maxfail=1`.
+`pyright`, `python -m compileall app client gui tests`, `pytest tests -q`, `pytest --maxfail=1`.
 Finally report changed files and residual risks.
 ```

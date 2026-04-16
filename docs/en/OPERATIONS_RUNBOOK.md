@@ -23,7 +23,7 @@
 1. Authentication issue
 - verify `device_sessions` expiry/revoke state
 - verify server NTP/time sync
-- verify `flask_session/` permission and disk space
+- verify `.session_store/` permission and disk space
 
 2. Realtime disconnect
 - verify Socket.IO connectivity
@@ -78,9 +78,10 @@ Recommended frequency:
 - `MAINTENANCE_INTERVAL_MINUTES=30`: cleanup scheduler interval
 - `RATE_LIMIT_STORAGE_URI=memory://`: in-memory rate-limit backend
 - `RATE_LIMIT_KEY_MODE=ip`: IP-based rate-limit key strategy
-- `UPLOAD_SCAN_ENABLED=False`, `UPLOAD_SCAN_PROVIDER=noop`: upload-scan scaffold disabled by default
-- `ENTERPRISE_AUTH_ENABLED=False`, `ENTERPRISE_AUTH_PROVIDER=""`: enterprise auth disabled by default (supports `mock`)
+- `UPLOAD_SCAN_ENABLED=False`, `UPLOAD_SCAN_PROVIDER=noop`: upload scanning disabled by default. Supported providers: `noop`, `http_json`, `clamd`
+- `ENTERPRISE_AUTH_ENABLED=False`, `ENTERPRISE_AUTH_PROVIDER=""`: enterprise auth disabled by default. Supported providers: `mock`, `http_json`, `ldap`
 - `REQUIRE_SIGNED_UPDATES_IN_PROD=True`: enforce signed update metadata in prod
+- `DESKTOP_CLIENT_SIGNING_PUBLIC_KEY_PEM`, `DESKTOP_CLIENT_CANARY_SIGNING_PUBLIC_KEY_PEM`: pinned public keys for desktop update signature verification
 
 ## 8) Recurring Maintenance
 

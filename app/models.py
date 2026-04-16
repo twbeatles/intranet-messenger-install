@@ -7,19 +7,20 @@ import sqlite3
 import logging
 import threading
 import time
+import os
 from contextlib import contextmanager
 from typing import Iterator, cast
 
 # config 임포트 (PyInstaller 호환)
 try:
-    from config import DATABASE_PATH, PASSWORD_SALT, UPLOAD_FOLDER
+    from config import DATABASE_PATH, PASSWORD_SALT
 except ImportError:
     import sys
-    import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from config import DATABASE_PATH, PASSWORD_SALT, UPLOAD_FOLDER
+    from config import DATABASE_PATH, PASSWORD_SALT
 
 from app.utils import E2ECrypto, hash_password, verify_password
+from app.runtime_paths import get_legacy_session_store_dir, get_session_store_dir, resolve_upload_path
 
 logger = logging.getLogger(__name__)
 
@@ -432,24 +433,29 @@ def cleanup_old_session_files(max_age_hours=24):
     except ImportError:
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    session_dir = os.path.join(BASE_DIR, 'flask_session')
-    if not os.path.exists(session_dir):
-        return 0
-    
     cutoff = datetime.now() - timedelta(hours=max_age_hours)
     removed = 0
     
     try:
-        for filename in os.listdir(session_dir):
-            filepath = os.path.join(session_dir, filename)
-            if os.path.isfile(filepath):
-                try:
-                    mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
-                    if mtime < cutoff:
-                        if safe_file_delete(filepath):
-                            removed += 1
-                except (OSError, ValueError):
-                    continue
+        session_dirs: list[str] = []
+        for candidate in (
+            get_session_store_dir(base_dir=BASE_DIR),
+            get_legacy_session_store_dir(base_dir=BASE_DIR),
+        ):
+            if candidate not in session_dirs and os.path.exists(candidate):
+                session_dirs.append(candidate)
+
+        for session_dir in session_dirs:
+            for filename in os.listdir(session_dir):
+                filepath = os.path.join(session_dir, filename)
+                if os.path.isfile(filepath):
+                    try:
+                        mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
+                        if mtime < cutoff:
+                            if safe_file_delete(filepath):
+                                removed += 1
+                    except (OSError, ValueError):
+                        continue
         
         if removed > 0:
             logger.info(f"Cleaned up {removed} expired session files (older than {max_age_hours}h)")
@@ -489,7 +495,7 @@ def cleanup_empty_rooms():
             files = cursor.fetchall()
             for f in files:
                 # [v4.14] safe_file_delete 사용으로 재시도 로직 적용
-                full_path = os.path.join(UPLOAD_FOLDER, f['file_path'])
+                full_path = resolve_upload_path(f['file_path'])
                 safe_file_delete(full_path)
             
             # 관련 데이터 삭제
@@ -1286,7 +1292,7 @@ def delete_message(message_id, user_id):
         
         # [v4.15] DB 커밋 성공 후에만 실제 파일 삭제 시도 (원자성 보장)
         if msg['file_path']:
-            full_path = os.path.join(UPLOAD_FOLDER, msg['file_path'])
+            full_path = resolve_upload_path(msg['file_path'])
             if safe_file_delete(full_path):
                 logger.debug(f"Message attachment deleted: {msg['file_path']}")
             else:
@@ -1733,8 +1739,7 @@ def delete_room_file(
         conn.commit()
         
         # [v4.14] safe_file_delete 사용으로 재시도 로직 적용
-        import os
-        full_path = os.path.join(UPLOAD_FOLDER, file_path)
+        full_path = resolve_upload_path(file_path)
         if safe_file_delete(full_path):
             logger.debug(f"File deleted from disk: {file_path}")
         
@@ -2038,7 +2043,7 @@ def delete_user(user_id, password):
         # [v4.7] 0. 프로필 이미지 파일 삭제
         if user['profile_image']:
             try:
-                profile_path = os.path.join(UPLOAD_FOLDER, user['profile_image'])
+                profile_path = resolve_upload_path(user['profile_image'])
                 if os.path.exists(profile_path):
                     os.remove(profile_path)
                     logger.debug(f"Profile image deleted: {user['profile_image']}")
@@ -2056,7 +2061,7 @@ def delete_user(user_id, password):
         files_to_delete = cursor.fetchall()
         for f in files_to_delete:
             try:
-                full_path = os.path.join(UPLOAD_FOLDER, f['file_path'])
+                full_path = resolve_upload_path(f['file_path'])
                 if os.path.exists(full_path):
                     os.remove(full_path)
                     logger.debug(f"File deleted during user cleanup: {f['file_path']}")

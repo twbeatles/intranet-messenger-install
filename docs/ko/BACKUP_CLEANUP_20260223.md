@@ -28,7 +28,7 @@
 
 - `.pytest_cache/`
 - `__pycache__/` 전체
-- `flask_session/`
+- `.session_store/`
 - `server.log`
 - `app/routes (1).py`, `app/sockets (1).py`
 - `app/models/messages (1).py`, `app/models/polls (1).py`, `app/models/users (1).py`
@@ -44,7 +44,7 @@
 
 | 분류 | 기준 | 예시 | 권장 조치 |
 |---|---|---|---|
-| 영구 삭제 대상 | 재생성 가능한 런타임/테스트 산출물 | `__pycache__/`, `.pytest_cache/`, `flask_session/`, `server.log`, `tests/*.txt`, `uploads/*token-file*.txt` | 즉시 삭제 가능 |
+| 영구 삭제 대상 | 재생성 가능한 런타임/테스트 산출물 | `__pycache__/`, `.pytest_cache/`, `.session_store/`, `server.log`, `tests/*.txt`, `uploads/*token-file*.txt` | 즉시 삭제 가능 |
 | 보존 대상(단기) | 중복 소스/자산 또는 과거 맥락 문서 | `app/routes (1).py`, `templates/index (1).html`, `static/js/messages (1).js`, `claude.md`, `gemini.md` | 1~2 릴리즈 보관 후 검토 삭제 |
 | 보존 대상(상시) | 정리 이력 및 복구 기준 정보 | `MOVED_FILES*.txt`, `MOVED_POST_VERIFY.txt`, 본 문서 | 유지 |
 

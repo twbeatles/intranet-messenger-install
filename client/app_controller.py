@@ -491,6 +491,7 @@ class MessengerAppController(QObject):
             file_name = upload.get('file_name') or Path(local_path).name
             message_type = self._guess_message_type(file_name, upload.get('file_type'))
             client_msg_id = uuid.uuid4().hex
+            resolved_local_path = str(Path(local_path).resolve())
             payload = {
                 'room_id': int(self.current_room_id),
                 'content': file_name,
@@ -498,6 +499,8 @@ class MessengerAppController(QObject):
                 'upload_token': token,
                 'encrypted': False,
                 'client_msg_id': client_msg_id,
+                '_local_path': resolved_local_path,
+                '_upload_token_issued_at': time.time(),
             }
             entry = {
                 'payload': payload,
@@ -507,6 +510,7 @@ class MessengerAppController(QObject):
                 'failed': False,
                 'is_file': True,
                 'file_name': file_name,
+                'local_path': resolved_local_path,
             }
             self._pending_sends[client_msg_id] = entry
             self._upsert_outbox_entry(client_msg_id, entry)

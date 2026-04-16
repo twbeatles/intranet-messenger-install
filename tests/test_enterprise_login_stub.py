@@ -1,71 +1,132 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
 
-def _register(client, username: str, password: str = 'Password123!'):
+
+def _register(client, username: str, password: str = "Password123!"):
     response = client.post(
-        '/api/register',
-        json={'username': username, 'password': password, 'nickname': username},
+        "/api/register",
+        json={"username": username, "password": password, "nickname": username},
     )
     assert response.status_code == 200
 
 
 def test_enterprise_login_disabled_by_default(client):
-    response = client.post('/api/auth/enterprise-login', json={'username': 'u', 'password': 'p'})
+    response = client.post("/api/auth/enterprise-login", json={"username": "u", "password": "p"})
     assert response.status_code == 501
 
 
 def test_enterprise_login_requires_provider_when_enabled(client):
-    client.application.config['ENTERPRISE_AUTH_ENABLED'] = True
-    client.application.config['ENTERPRISE_AUTH_PROVIDER'] = ''
-    response = client.post('/api/auth/enterprise-login', json={'username': 'u', 'password': 'p'})
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = ""
+    response = client.post("/api/auth/enterprise-login", json={"username": "u", "password": "p"})
     assert response.status_code == 400
 
 
 def test_enterprise_login_unknown_provider_returns_501(client):
-    client.application.config['ENTERPRISE_AUTH_ENABLED'] = True
-    client.application.config['ENTERPRISE_AUTH_PROVIDER'] = 'ldap'
-    response = client.post('/api/auth/enterprise-login', json={'username': 'u', 'password': 'p'})
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "unknown-provider"
+    response = client.post("/api/auth/enterprise-login", json={"username": "u", "password": "p"})
     assert response.status_code == 501
 
 
-def test_enterprise_login_mock_success_with_existing_local_account(client):
-    _register(client, 'ent_local')
-    client.application.config['ENTERPRISE_AUTH_ENABLED'] = True
-    client.application.config['ENTERPRISE_AUTH_PROVIDER'] = 'mock'
-    client.application.config['ENTERPRISE_MOCK_USERS'] = {'ent_local': 'ent-pass'}
+def test_enterprise_login_http_json_success_with_existing_local_account(client, monkeypatch):
+    import httpx
+
+    class _Response:
+        status_code = 200
+        is_success = True
+
+        @staticmethod
+        def json():
+            return {"ok": True, "identity": {"username": "ent_http"}}
+
+    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: _Response())
+    _register(client, "ent_http")
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "http_json"
+    client.application.config["ENTERPRISE_HTTP_URL"] = "https://auth.example.invalid/login"
 
     response = client.post(
-        '/api/auth/enterprise-login',
-        json={'username': 'ent_local', 'password': 'ent-pass'},
+        "/api/auth/enterprise-login",
+        json={"username": "ent_http", "password": "ent-pass"},
     )
     assert response.status_code == 200
     payload = response.json
-    assert payload['success'] is True
-    assert payload['provider'] == 'mock'
-    assert payload['user']['username'] == 'ent_local'
-    assert payload.get('csrf_token')
+    assert payload["success"] is True
+    assert payload["provider"] == "http_json"
+    assert payload["user"]["username"] == "ent_http"
+
+
+def test_enterprise_login_http_json_rejects_bad_credentials(client, monkeypatch):
+    import httpx
+
+    class _Response:
+        status_code = 401
+        is_success = False
+
+        @staticmethod
+        def json():
+            return {"ok": False, "error": "bad credentials"}
+
+    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: _Response())
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "http_json"
+    client.application.config["ENTERPRISE_HTTP_URL"] = "https://auth.example.invalid/login"
+
+    response = client.post(
+        "/api/auth/enterprise-login",
+        json={"username": "ent_http_bad", "password": "wrong"},
+    )
+    assert response.status_code == 401
+
+
+def test_enterprise_login_ldap_requires_runtime_configuration(client):
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "ldap"
+
+    response = client.post("/api/auth/enterprise-login", json={"username": "u", "password": "p"})
+    assert response.status_code == 500
+
+
+def test_enterprise_login_mock_success_with_existing_local_account(client):
+    _register(client, "ent_local")
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "mock"
+    client.application.config["ENTERPRISE_MOCK_USERS"] = {"ent_local": "ent-pass"}
+
+    response = client.post(
+        "/api/auth/enterprise-login",
+        json={"username": "ent_local", "password": "ent-pass"},
+    )
+    assert response.status_code == 200
+    payload = response.json
+    assert payload["success"] is True
+    assert payload["provider"] == "mock"
+    assert payload["user"]["username"] == "ent_local"
+    assert payload.get("csrf_token")
 
 
 def test_enterprise_login_mock_rejects_bad_credentials(client):
-    _register(client, 'ent_bad')
-    client.application.config['ENTERPRISE_AUTH_ENABLED'] = True
-    client.application.config['ENTERPRISE_AUTH_PROVIDER'] = 'mock'
-    client.application.config['ENTERPRISE_MOCK_USERS'] = {'ent_bad': 'correct-pass'}
+    _register(client, "ent_bad")
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "mock"
+    client.application.config["ENTERPRISE_MOCK_USERS"] = {"ent_bad": "correct-pass"}
 
     response = client.post(
-        '/api/auth/enterprise-login',
-        json={'username': 'ent_bad', 'password': 'wrong-pass'},
+        "/api/auth/enterprise-login",
+        json={"username": "ent_bad", "password": "wrong-pass"},
     )
     assert response.status_code == 401
 
 
 def test_enterprise_login_mock_requires_existing_local_account(client):
-    client.application.config['ENTERPRISE_AUTH_ENABLED'] = True
-    client.application.config['ENTERPRISE_AUTH_PROVIDER'] = 'mock'
-    client.application.config['ENTERPRISE_MOCK_USERS'] = {'ent_only_external': 'ent-pass'}
+    client.application.config["ENTERPRISE_AUTH_ENABLED"] = True
+    client.application.config["ENTERPRISE_AUTH_PROVIDER"] = "mock"
+    client.application.config["ENTERPRISE_MOCK_USERS"] = {"ent_only_external": "ent-pass"}
 
     response = client.post(
-        '/api/auth/enterprise-login',
-        json={'username': 'ent_only_external', 'password': 'ent-pass'},
+        "/api/auth/enterprise-login",
+        json={"username": "ent_only_external", "password": "ent-pass"},
     )
     assert response.status_code == 404
