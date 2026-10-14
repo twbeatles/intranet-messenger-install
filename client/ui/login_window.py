@@ -97,13 +97,13 @@ class LoginWindow(QDialog):
         self.password_label = QLabel('')
 
         # 비밀번호 표시/숨기기 토글 액션
-        toggle_action = self.password_input.addAction(
-            QAction("👁", self.password_input),
+        # NOTE: QLineEdit.addAction()은 None을 반환하므로 QAction을 먼저
+        # 생성한 뒤 addAction으로 등록한다.
+        self._toggle_pw_action = QAction("👁", self.password_input)
+        self.password_input.addAction(
+            self._toggle_pw_action,
             QLineEdit.ActionPosition.TrailingPosition,
         )
-        if toggle_action is None:
-            raise RuntimeError('password visibility action could not be created')
-        self._toggle_pw_action = toggle_action
         self._toggle_pw_action.triggered.connect(self._toggle_password_visibility)
         form.addRow(self.password_label, self.password_input)
 
