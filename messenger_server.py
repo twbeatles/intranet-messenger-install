@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 사내 웹메신저 시스템 v2.6
-Flask + Socket.IO + PyQt6 GUI 기반 실시간 채팅 서버
+Flask + Socket.IO + PySide6 GUI 기반 실시간 채팅 서버
 - 종단간 암호화 (E2E Encryption)
 - 시스템 트레이 아이콘
 - Windows 시작 프로그램 등록
@@ -46,14 +46,14 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QSystemTrayIcon, QMenu, QTextEdit, QLineEdit,
     QSpinBox, QCheckBox, QGroupBox, QTabWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QFrame, QSplitter
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QSettings
-from PyQt6.QtGui import QIcon, QAction, QFont, QColor, QPixmap, QPainter, QBrush
+from PySide6.QtCore import Qt, QTimer, Signal, QThread, QSettings
+from PySide6.QtGui import QIcon, QAction, QFont, QColor, QPixmap, QPainter, QBrush
 
 # ============================================================================
 # 설정
@@ -1880,11 +1880,11 @@ HTML_TEMPLATE = '''
 '''
 
 # ============================================================================
-# PyQt6 GUI - 서버 관리 창
+# PySide6 GUI - 서버 관리 창
 # ============================================================================
 class ServerThread(QThread):
     """Flask 서버를 별도 스레드에서 실행"""
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     
     def __init__(self, host='0.0.0.0', port=5000):
         super().__init__()
@@ -2312,7 +2312,7 @@ if __name__ == '__main__':
     raise SystemExit(
         "messenger_server.py is a legacy entrypoint. Use 'python server.py --cli' for the maintained server runtime."
     )
-    # PyQt6 GUI 모드
+    # PySide6 GUI 모드
     qt_app = QApplication(sys.argv)
     qt_app.setQuitOnLastWindowClosed(False)  # 트레이 아이콘으로 계속 실행
     

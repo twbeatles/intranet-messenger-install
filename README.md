@@ -3,7 +3,7 @@
 > **English README**: [`README.en.md`](README.en.md) | **문서 허브**: [`docs/README.md`](docs/README.md)
 
 **사내 메신저**는 사내 업무 환경에서 안전하고 빠른 협업을 지원하기 위해 개발된 **Windows 데스크톱 우선(Desktop-First) 보안 메신저 솔루션**입니다.  
-고성능 `Flask + Socket.IO` 백엔드 서버와 직관적이고 미려한 `PySide6` 데스크톱 클라이언트, 그리고 손쉬운 운영을 위한 `PyQt6` 서버 관리 GUI를 제공합니다.
+고성능 `Flask + Socket.IO` 백엔드 서버와 직관적이고 미려한 `PySide6` 데스크톱 클라이언트, 그리고 손쉬운 운영을 위한 `PySide6` 서버 관리 GUI를 제공합니다.
 
 ---
 
@@ -349,7 +349,7 @@ python -m compileall app client gui tests
 │  ├─ controllers/           # 세션/방/메시지 코디네이터 및 소켓 라우터
 │  ├─ services/              # API 통신, E2E 암호화, 소켓, 트레이, 업데이트 체커
 │  └─ ui/                    # 메인 윈도우, 로그인 창, 설정/파일/투표/관리자 다이얼로그
-├─ gui/                      # PyQt6 기반 서버 관리자 GUI 콘솔
+├─ gui/                      # PySide6 기반 서버 관리자 GUI 콘솔
 │  ├─ server_window.py       # 서버 관리 메인 윈도우 UI 및 탭 제어
 │  └─ server_process.py      # Flask-SocketIO 멀티프로세스 분리 실행 스레드
 ├─ i18n/                     # 다국어(한국어/영어) 번역 카탈로그 JSON

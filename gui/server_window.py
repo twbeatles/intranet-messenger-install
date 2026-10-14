@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-PyQt6 GUI - 서버 관리 창 v4.2
+PySide6 GUI - 서버 관리 창 v4.2
 - HiDPI 디스플레이 지원
 - 토스트 알림 시스템
 - 체크박스/버튼 UI 개선
@@ -13,18 +13,18 @@ import socket
 import winreg
 from datetime import datetime
 
-# HiDPI 지원 (PyQt6 import 전에 설정)
+# HiDPI 지원 (PySide6 import 전에 설정)
 os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '1'
 os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QSystemTrayIcon, QTextEdit,
     QSpinBox, QCheckBox, QGroupBox, QTabWidget,
     QComboBox
 )
-from PyQt6.QtCore import Qt, QTimer, QSettings
-from PyQt6.QtGui import QCloseEvent
+from PySide6.QtCore import Qt, QTimer, QSettings
+from PySide6.QtGui import QCloseEvent
 
 # 부모 디렉토리에서 import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

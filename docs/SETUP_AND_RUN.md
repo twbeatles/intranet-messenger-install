@@ -23,7 +23,7 @@ CLI 모드:
 python server.py --cli
 ```
 
-GUI 서버 창 모드(PyQt6 필요):
+GUI 서버 창 모드(PySide6 필요):
 
 ```powershell
 python server.py

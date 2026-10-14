@@ -25,7 +25,7 @@ CLI mode:
 python server.py --cli
 ```
 
-GUI mode (requires PyQt6):
+GUI mode (requires PySide6):
 
 ```powershell
 python server.py

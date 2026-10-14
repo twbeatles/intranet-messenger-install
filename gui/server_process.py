@@ -11,7 +11,7 @@ import threading
 import urllib.error
 import urllib.request
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from config import BASE_DIR, CONTROL_PORT
 
@@ -49,8 +49,8 @@ def kill_process_on_port(port: int) -> bool:
 
 
 class ServerThread(QThread):
-    log_signal = pyqtSignal(str)
-    stats_signal = pyqtSignal(dict)
+    log_signal = Signal(str)
+    stats_signal = Signal(dict)
 
     def __init__(self, host="0.0.0.0", port=5000, use_https=False):
         super().__init__()

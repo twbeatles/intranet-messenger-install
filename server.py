@@ -11,7 +11,7 @@ import sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
-# [v4.1] GUI 모드에서는 gevent 비활성화 (PyQt6 충돌 방지)
+# [v4.1] GUI 모드에서는 gevent 비활성화 (PySide6 충돌 방지)
 # 이 설정은 app/__init__.py의 monkey patching 전에 적용되어야 함
 if len(sys.argv) <= 1 or sys.argv[1] != '--cli':
     os.environ['SKIP_GEVENT_PATCH'] = '1'
@@ -107,7 +107,7 @@ def run_server_cli():
 
 def run_server_gui():
     """GUI 모드로 서버 실행"""
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
     from gui.server_window import ServerWindow
     
     qt_app = QApplication(sys.argv)
@@ -135,12 +135,12 @@ if __name__ == '__main__':
             try:
                 run_server_gui()
             except ImportError:
-                print("PyQt6를 찾을 수 없습니다. CLI 모드로 실행합니다.")
+                print("PySide6를 찾을 수 없습니다. CLI 모드로 실행합니다.")
                 run_server_cli()
     else:
         # 인수가 없으면 GUI 모드
         try:
             run_server_gui()
         except ImportError:
-            print("PyQt6를 찾을 수 없습니다. CLI 모드로 실행합니다.")
+            print("PySide6를 찾을 수 없습니다. CLI 모드로 실행합니다.")
             run_server_cli()

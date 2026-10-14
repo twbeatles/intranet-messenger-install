@@ -50,7 +50,7 @@ app/realtime/        split Socket.IO events/state/emission helpers
 client/              PySide6 desktop client entry/facade/services
 client/controllers/  desktop coordinators/router/policies
 client/ui/           Qt windows + extracted render helpers
-gui/                 PyQt6 server management GUI + split tray/process helpers
+gui/                 PySide6 server management GUI + split tray/process helpers
 static/css/          CSS manifest entry + split fragments
 static/js/modules/   module entry bridge for the maintained web client
 i18n/                ko/en catalogs (server/client/web/server_gui)

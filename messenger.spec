@@ -35,8 +35,8 @@ EXCLUDES = [
     "test",
     "pysqlite2",
     "MySQLdb",
-    # Server build uses PyQt6 only.
-    "PySide6",
+    # Server build uses PySide6 only.
+    "PyQt6",
 ]
 
 hiddenimports = sorted(
@@ -76,10 +76,11 @@ hiddenimports = sorted(
             "httpx",
             "keyring",
             "keyring.backends",
+            "PySide6",
         ]
         # Split server packages are pulled in automatically.
         + collect_submodules("app")
-        # Server desktop management window lives under gui/ and uses PyQt6.
+        # Server desktop management window lives under gui/ and uses PySide6.
         + collect_submodules("gui")
     )
 )
